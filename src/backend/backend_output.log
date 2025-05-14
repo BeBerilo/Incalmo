@@ -1,0 +1,21 @@
+INFO:     Will watch for changes in these directories: ['/Users/lorenzo/Downloads/source_code/src/backend']
+INFO:     Uvicorn running on http://0.0.0.0:8767 (Press CTRL+C to quit)
+INFO:     Started reloader process [15275] using StatReload
+Port 8713 is in use, using port 8767 instead
+Starting server on port 8767
+INFO:     Started server process [15278]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:59208 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59239 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59242 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59245 - "POST /api/llm/session/create HTTP/1.1" 200 OK
+INFO:     ('127.0.0.1', 59247) - "WebSocket /ws/session_aecabc87" [accepted]
+INFO:     connection open
+INFO:     Shutting down
+INFO:     connection closed
+INFO:     Waiting for background tasks to complete. (CTRL+C to force quit)
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [15278]
+INFO:     Stopping reloader process [15275]

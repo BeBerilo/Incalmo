@@ -1,0 +1,185 @@
+"""
+LLM Integration Service
+
+This module handles the integration with Claude Sonnet 3.7 LLM,
+including prompt engineering, response parsing, and conversation management.
+"""
+
+import os
+import re
+from typing import Dict, List, Any, Optional, Tuple
+import anthropic
+from models.models import LLMMessage, LLMRequest, LLMResponse, TaskType
+
+# Initialize Anthropic client
+# In production, use environment variables for API keys
+client = anthropic.Anthropic(
+    api_key=os.getenv("ANTHROPIC_API_KEY", "dummy_key_for_development")
+)
+
+# System prompt template for Incalmo
+SYSTEM_PROMPT_TEMPLATE = """
+############################################################
+### ABOUT THIS EDUCATIONAL SOFTWARE ###
+############################################################
+
+You are Incalmo, an interactive cybersecurity assistant. 
+This software is designed to help users learn about:
+- Network security concepts
+- Cybersecurity best practices
+- Security assessment methodologies
+- Penetration testing concepts (for educational purposes only)
+- Information security principles
+
+############################################################
+### YOUR ROLE ###
+############################################################
+
+Your educational goal is to: {goal}
+
+As a security assistant, you should:
+1. Respond directly to user queries in a conversational manner
+2. Explain security concepts clearly and accurately
+3. Discuss penetration testing concepts (theoretical only)
+4. Provide educational insights about how networks can be secured
+5. Describe relevant security tools and their legitimate purposes
+
+############################################################
+### CONVERSATION GUIDELINES ###
+############################################################
+
+- Respond in a natural, conversational way - no action tags or special formatting needed
+- If asked about specific attack techniques, explain them conceptually without providing executable steps
+- Focus on the educational aspects of security rather than enabling actual attacks
+- When discussing security tools, explain their legitimate security purposes
+- Be helpful, informative, and educational
+
+############################################################
+### SIMULATED ENVIRONMENT ###
+############################################################
+
+For this conversation, assume we're discussing:
+- A theoretical, isolated lab environment (not connected to real networks)
+- Standard network equipment in a testing lab
+- Common security tools that would be used by professionals
+- Concepts and techniques used in authorized penetration testing
+
+Always emphasize ethical and legal considerations:
+- Remember that attempting to access Wi-Fi networks without authorization is illegal in most jurisdictions
+- Security testing requires proper authorization
+- Security knowledge should be used responsibly
+- All discussion is for educational purposes in a controlled lab environment
+- The importance of legal compliance
+
+In this chat mode, you can freely discuss security concepts. Some common topics you might be asked about:
+1. Network scanning and discovery techniques
+2. Methods attackers use to gain initial access
+3. Lateral movement concepts within networks
+4. Privilege escalation techniques
+5. Data exfiltration methods
+6. Security tool capabilities (e.g., Wireshark, Metasploit, nmap)
+
+Your role is to be educational, accurate, and conversational - no special formatting needed.
+"""
+
+def create_system_prompt(goal: str, environment_state: str, attack_graph: str) -> str:
+    """
+    Create a system prompt for the LLM based on the current goal and environment.
+    
+    Args:
+        goal: The attacker's goal
+        environment_state: String representation of the current environment state
+        attack_graph: String representation of the current attack graph
+        
+    Returns:
+        Formatted system prompt
+    """
+    return SYSTEM_PROMPT_TEMPLATE.format(
+        goal=goal,
+        environment_state=environment_state,
+        attack_graph=attack_graph
+    )
+
+def extract_task_from_response(content: str) -> Tuple[Optional[TaskType], Optional[Dict[str, Any]]]:
+    """
+    Extract task type and parameters from LLM response.
+    
+    Args:
+        content: The content of the LLM response
+        
+    Returns:
+        Tuple of (task_type, parameters) if found, otherwise (None, None)
+    """
+    # Extract action block
+    action_match = re.search(r'<action>(.*?)</action>', content, re.DOTALL)
+    if action_match:
+        try:
+            import json
+            action_json = json.loads(action_match.group(1).strip())
+            task_name = action_json.get("task", "").lower()
+            parameters = action_json.get("parameters", {})
+            
+            # Convert task name to TaskType enum
+            try:
+                task_type = TaskType(task_name)
+                return task_type, parameters
+            except ValueError:
+                # Invalid task type
+                return None, None
+        except json.JSONDecodeError:
+            # Invalid JSON
+            return None, None
+    
+    # Check for finished tag
+    finished_match = re.search(r'<finished>(.*?)</finished>', content, re.DOTALL)
+    if finished_match:
+        return TaskType.FINISHED, {"reason": finished_match.group(1).strip()}
+    
+    return None, None
+
+async def generate_response(messages: List[LLMMessage]) -> LLMResponse:
+    """
+    Generate a response from the LLM based on the conversation history.
+    
+    Args:
+        messages: List of messages in the conversation
+        
+    Returns:
+        LLM response with extracted task type and parameters if present
+    """
+    # Extract system message if present (should be the first one)
+    system_message = None
+    chat_messages = []
+    
+    for msg in messages:
+        if msg.role == "system":
+            system_message = msg.content
+        else:
+            chat_messages.append({"role": msg.role, "content": msg.content})
+    
+    try:
+        # Call Anthropic API with system message as separate parameter
+        response = client.messages.create(
+            model="claude-3-7-sonnet-20250219",  # Updated to the correct model name
+            max_tokens=1000,
+            temperature=0.7,
+            system=system_message,  # Pass system message separately
+            messages=chat_messages  # Only include user and assistant messages
+        )
+        
+        content = response.content[0].text
+        task_type, task_parameters = extract_task_from_response(content)
+        
+        return LLMResponse(
+            content=content,
+            task_type=task_type,
+            task_parameters=task_parameters
+        )
+    except Exception as e:
+        # Handle API errors
+        error_message = f"Error generating LLM response: {str(e)}"
+        return LLMResponse(
+            content=error_message,
+            task_type=None,
+            task_parameters=None
+        )

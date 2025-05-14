@@ -1,0 +1,80 @@
+{
+  "name": "incalmo",
+  "version": "1.0.0",
+  "description": "LLM-powered multistage network attack tool based on Incalmo",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "NODE_ENV=development electron .",
+    "prepare-backend": "chmod +x ./scripts/prepare_python_env.sh && ./scripts/prepare_python_env.sh",
+    "package-backend": "chmod +x ./scripts/package_backend.sh && ./scripts/package_backend.sh",
+    "build": "npm run prepare-backend && npm run package-backend && electron-builder build --mac",
+    "build:dir": "npm run prepare-backend && npm run package-backend && electron-builder build --mac --dir"
+  },
+  "keywords": [
+    "incalmo",
+    "llm",
+    "network",
+    "attack",
+    "claude",
+    "sonnet"
+  ],
+  "author": "Incalmo Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.6.4"
+  },
+  "build": {
+    "appId": "com.incalmo.app",
+    "productName": "Incalmo",
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": "dmg",
+      "icon": "build/icon.icns",
+      "darkModeSupport": true
+    },
+    "files": [
+      "**/*",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!**/node_modules/*.d.ts",
+      "!**/node_modules/.bin",
+      "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}",
+      "!.editorconfig",
+      "!**/._*",
+      "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
+      "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}",
+      "!**/{appveyor.yml,.travis.yml,circle.yml}",
+      "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}",
+      "!**/src/**",
+      "!backend_venv/**",
+      "!scripts/**"
+    ],
+    "extraResources": [
+      {
+        "from": "backend_dist",
+        "to": "backend",
+        "filter": ["**/*"]
+      }
+    ],
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 380
+      }
+    }
+  }
+}

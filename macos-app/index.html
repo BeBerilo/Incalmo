@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Incalmo - LLM-powered Network Attack Tool</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>Incalmo</h1>
+            <p class="subtitle">LLM-powered multistage network attack tool</p>
+        </header>
+        
+        <div class="main-content">
+            <!-- Goal Input at the top -->
+            <div id="goal-controls">
+                <div class="goal-input-container">
+                    <input type="text" id="goal-input" placeholder="Enter your security goal...">
+                    <button id="create-session-btn" class="primary-btn">Start</button>
+                    <div id="loading-indicator" class="loading-container hidden">
+                        <div class="loading-spinner"></div>
+                    </div>
+                </div>
+                
+                <!-- Mode indicator -->
+                <div id="autonomous-mode-indicator" class="mode-indicator hidden">
+                    <span class="mode-icon">🎯</span> <span class="mode-text">Goal-based Autonomous Mode</span>
+                </div>
+                
+                <!-- Session info hidden from users -->
+                <div id="session-info" class="hidden" style="display:none !important;">
+                    <p>Session ID: <span id="session-id">None</span></p>
+                    <p>Status: <span id="session-status">Inactive</span></p>
+                </div>
+            </div>
+            
+            <!-- Chat and Terminal in vertical layout -->
+            <div class="content-area">
+                <!-- Chat Interface -->
+                <div id="chat-view" class="view active">
+                    <div class="chat-container">
+                        <div class="chat-controls">
+                            <button id="clear-chat-btn" class="secondary-btn">Clear Chat</button>
+                            <button id="toggle-terminal-btn" class="secondary-btn">Toggle Terminal</button>
+                            <button id="toggle-chat-mode-btn" class="secondary-btn">Command Mode: Enabled</button>
+                        </div>
+                        
+                        <!-- Main chat -->
+                        <div id="chat-messages">
+                            <!-- Welcome message -->
+                            <div class="system-message">
+                                <strong>System: </strong>
+                                <div>
+                                    <p>Enter your security goal above and click "Start" to begin.</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Terminal that can toggle to full screen -->
+                        <div id="terminal-window" class="hidden">
+                            <div class="terminal-header">
+                                <span>Terminal Output</span>
+                                <button id="clear-terminal-btn" class="mini-btn">Clear</button>
+                            </div>
+                            <div id="terminal-output"></div>
+                        </div>
+                        
+                        <div class="suggested-actions">
+                            <button id="suggest-scan" class="suggestion-btn" disabled>Scan Network</button>
+                            <button id="suggest-execute" class="suggestion-btn" disabled>Run Command</button>
+                            <button id="suggest-help" class="suggestion-btn" disabled>Help</button>
+                            <button id="suggest-status" class="suggestion-btn" disabled>Status</button>
+                        </div>
+                        
+                        <div class="chat-input-container">
+                            <textarea id="chat-input" placeholder="Ask me anything or give me a command..." disabled></textarea>
+                            <button id="send-message-btn" class="primary-btn" disabled>Send</button>
+                            <div id="input-loading-indicator" class="chat-loading-spinner hidden"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Hidden log entries for debugging -->
+                <div id="log-entries" style="display:none;">
+                    <p class="log-entry info">Application started</p>
+                </div>
+            </div>
+            
+            <div class="backend-status" style="display:none;">
+                <p>Status: <span id="backend-status">Checking...</span></p>
+                <p>API: <span id="backend-url">Loading...</span></p>
+            </div>
+        </div>
+        
+        <footer class="app-footer">
+            <div id="footer-loading-indicator" class="loading-spinner hidden"></div>
+            <div>
+                <p>Based on arXiv paper: "On the Feasibility of Using LLMs to Execute Multistage Network Attacks"</p>
+                <p>Powered by Claude 3.7 Sonnet</p>
+            </div>
+        </footer>
+    </div>
+    
+    <script src="renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,146 @@
+
+[0;34m=== Checking Prerequisites ===[0m
+
+[0;32m✓ Python 3.13.1 is installed[0m
+[0;32m✓ Node.js v22.14.0 is installed[0m
+[0;32m✓ npm 11.1.0 is installed[0m
+[1;33m! Detected macOS: Using macOS-compatible dependencies[0m
+[0;32m✓ Rust 1.85.0 is installed[0m
+[0;32m✓ Xcode command line tools are installed[0m
+
+[0;34m=== Setting up Environment ===[0m
+
+[0;32m✓ Backend .env file already exists[0m
+
+[0;34m=== Setting up Backend ===[0m
+
+[0;32m✓ Python virtual environment already exists[0m
+Activating virtual environment and installing dependencies...
+[1;33m! Using project-level macOS requirements file...[0m
+[1;33m! Installing macOS-compatible dependencies...[0m
+Requirement already satisfied: pip in ./venv/lib/python3.13/site-packages (25.0.1)
+Requirement already satisfied: fastapi>=0.104.1 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 1)) (0.115.12)
+Requirement already satisfied: uvicorn>=0.24.0 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 2)) (0.34.0)
+Requirement already satisfied: pydantic>=2.5.0 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 3)) (2.11.2)
+Requirement already satisfied: anthropic>=0.18.0 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 4)) (0.49.0)
+Requirement already satisfied: sqlalchemy>=2.0.28 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 5)) (2.0.40)
+Requirement already satisfied: networkx>=3.3 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 6)) (3.4.2)
+Requirement already satisfied: pytest>=7.4.3 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 7)) (8.3.5)
+Requirement already satisfied: python-dotenv>=1.0.0 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 8)) (1.1.0)
+Requirement already satisfied: websockets>=11.0.3 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 9)) (15.0.1)
+Requirement already satisfied: httpx>=0.25.0 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 10)) (0.28.1)
+Requirement already satisfied: python-multipart>=0.0.7 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 11)) (0.0.20)
+Requirement already satisfied: typing-extensions>=4.9.0 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 12)) (4.13.1)
+Requirement already satisfied: anyio>=4.2.0 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 13)) (4.9.0)
+Requirement already satisfied: click>=8.1.7 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 14)) (8.1.8)
+Requirement already satisfied: h11>=0.14.0 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 15)) (0.14.0)
+Requirement already satisfied: idna>=3.6 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 16)) (3.10)
+Requirement already satisfied: sniffio>=1.3.0 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 17)) (1.3.1)
+Requirement already satisfied: pluggy>=1.3.0 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 18)) (1.5.0)
+Requirement already satisfied: packaging>=23.2 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 19)) (24.2)
+Requirement already satisfied: exceptiongroup>=1.2.0 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 20)) (1.2.2)
+Requirement already satisfied: iniconfig>=2.0.0 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 21)) (2.1.0)
+Requirement already satisfied: certifi>=2023.11.17 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 22)) (2025.1.31)
+Requirement already satisfied: distro>=1.9.0 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 23)) (1.9.0)
+Requirement already satisfied: requests>=2.31.0 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 24)) (2.32.3)
+Requirement already satisfied: urllib3>=2.1.0 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 25)) (2.3.0)
+Requirement already satisfied: charset-normalizer>=3.3.2 in ./venv/lib/python3.13/site-packages (from -r requirements_macos.txt (line 26)) (3.4.1)
+Requirement already satisfied: starlette<0.47.0,>=0.40.0 in ./venv/lib/python3.13/site-packages (from fastapi>=0.104.1->-r requirements_macos.txt (line 1)) (0.46.1)
+Requirement already satisfied: annotated-types>=0.6.0 in ./venv/lib/python3.13/site-packages (from pydantic>=2.5.0->-r requirements_macos.txt (line 3)) (0.7.0)
+Requirement already satisfied: pydantic-core==2.33.1 in ./venv/lib/python3.13/site-packages (from pydantic>=2.5.0->-r requirements_macos.txt (line 3)) (2.33.1)
+Requirement already satisfied: typing-inspection>=0.4.0 in ./venv/lib/python3.13/site-packages (from pydantic>=2.5.0->-r requirements_macos.txt (line 3)) (0.4.0)
+Requirement already satisfied: jiter<1,>=0.4.0 in ./venv/lib/python3.13/site-packages (from anthropic>=0.18.0->-r requirements_macos.txt (line 4)) (0.9.0)
+Requirement already satisfied: greenlet>=1 in ./venv/lib/python3.13/site-packages (from sqlalchemy>=2.0.28->-r requirements_macos.txt (line 5)) (3.1.1)
+Requirement already satisfied: httpcore==1.* in ./venv/lib/python3.13/site-packages (from httpx>=0.25.0->-r requirements_macos.txt (line 10)) (1.0.7)
+[0;32m✓ Installed backend dependencies[0m
+
+[0;34m=== Setting up Frontend ===[0m
+
+Installing frontend dependencies...
+
+up to date, audited 327 packages in 824ms
+
+49 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+[0;32m✓ Installed frontend dependencies[0m
+Creating app icon...
+Creating app icon...
+SVG icon created at /Users/lorenzo/Downloads/source_code/macos-app/build/icon.svg
+Created placeholder icns file at /Users/lorenzo/Downloads/source_code/macos-app/build/icon.icns
+Done!
+[0;32m✓ Created app icon[0m
+
+[0;34m=== Starting Backend Server ===[0m
+
+[1;33m! Port 8713 is already in use. Checking if it's our backend...[0m
+[1;33m! An Incalmo backend server is already running on port 8713.[0m
+[1;33m! Using the existing backend server.[0m
+Waiting for backend to start...
+[1;33m! Backend is running on port 8713 instead of default 8713[0m
+Checking if backend is running...
+Waiting for backend to start (attempt 1/15)...
+Waiting for backend to start (attempt 2/15)...
+Waiting for backend to start (attempt 3/15)...
+Waiting for backend to start (attempt 4/15)...
+Waiting for backend to start (attempt 5/15)...
+Waiting for backend to start (attempt 6/15)...
+Waiting for backend to start (attempt 7/15)...
+Waiting for backend to start (attempt 8/15)...
+Waiting for backend to start (attempt 9/15)...
+Waiting for backend to start (attempt 10/15)...
+Waiting for backend to start (attempt 11/15)...
+Waiting for backend to start (attempt 12/15)...
+Waiting for backend to start (attempt 13/15)...
+Waiting for backend to start (attempt 14/15)...
+[0;31m✗ Backend server failed to start. Check backend.log for details.[0m
+INFO:     Started server process [3962]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8713 (Press CTRL+C to quit)
+INFO:     127.0.0.1:65019 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65138 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65140 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65365 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65367 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65464 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65466 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49187 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49195 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49338 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49341 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50202 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50204 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50297 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50299 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50441 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50443 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50583 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50585 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50702 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50705 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50820 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50823 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50984 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50986 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52173 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52176 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52341 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52343 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52637 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52646 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52936 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53087 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53089 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53140 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53142 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53230 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53234 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53602 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53604 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53786 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53789 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53889 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53891 - "GET /health HTTP/1.1" 200 OK
