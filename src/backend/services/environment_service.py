@@ -28,9 +28,48 @@ class EnvironmentStateService:
         Returns:
             Initial environment state
         """
+
         if not config:
             # Create a default environment for testing
             return self._create_default_environment()
+
+        # Support simple config shortcut using num_networks and hosts_per_network
+        if "networks" not in config:
+            num_networks = int(config.get("num_networks", 1))
+            hosts_per_network = int(config.get("hosts_per_network", 3))
+
+            networks = []
+            for net_idx in range(num_networks):
+                hosts = []
+                for host_idx in range(hosts_per_network):
+                    host_id = f"net{net_idx+1}_host{host_idx+1}"
+                    ip_address = f"192.168.{net_idx}.{host_idx+1}"
+                    host = Host(
+                        id=host_id,
+                        ip_address=ip_address,
+                        hostname=f"host{host_idx+1}",
+                        os_type="Linux",
+                        services=[{"name": "ssh", "port": 22}],
+                        vulnerabilities=[],
+                        compromised=False,
+                    )
+                    hosts.append(host)
+
+                network = Network(
+                    id=f"network{net_idx+1}",
+                    name=f"Network {net_idx+1}",
+                    cidr=f"192.168.{net_idx}.0/24",
+                    hosts=hosts,
+                )
+                networks.append(network)
+
+            return EnvironmentState(
+                networks=networks,
+                current_host=None,
+                discovered_hosts=[],
+                compromised_hosts=[],
+                exfiltrated_data=[],
+            )
         
         # Create environment from config
         networks = []
@@ -245,7 +284,8 @@ class EnvironmentStateService:
             "discovered_hosts": len(environment_state.discovered_hosts),
             "compromised_hosts": len(environment_state.compromised_hosts),
             "current_host": environment_state.current_host,
-            "exfiltrated_data_items": len(environment_state.exfiltrated_data)
+            # Keep key name consistent with API tests
+            "exfiltrated_data": len(environment_state.exfiltrated_data)
         }
     
     def get_environment_state_text(self, environment_state: EnvironmentState) -> str:
