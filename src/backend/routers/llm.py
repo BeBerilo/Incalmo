@@ -9,7 +9,7 @@ import json
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 from models.models import LLMMessage, LLMRequest, LLMResponse, SessionState, TaskType
-from services.llm_service import generate_response, create_system_prompt
+from services.llm_service import generate_response, create_system_prompt, set_api_key, reset_api_key
 from services.environment_service import environment_state_service
 from services.attack_graph_service import attack_graph_service
 from core import create_session, process_llm_message
@@ -28,7 +28,7 @@ async def generate_llm_response(request: LLMRequest):
         LLM response with extracted task type and parameters if present
     """
     try:
-        response = await generate_response(request.messages)
+        response = await generate_response(request.messages, request.provider, request.model)
         return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating LLM response: {str(e)}")
@@ -55,6 +55,8 @@ async def create_system_prompt_endpoint(goal: str, environment_state: str, attac
 class SessionRequest(BaseModel):
     goal: str
     environment_config: Optional[Dict[str, Any]] = None
+    provider: str = "anthropic"
+    model: str = "claude-3-7-sonnet-20250219"
 
 @router.post("/session/create", response_model=SessionState)
 async def create_session_endpoint(request: SessionRequest):
@@ -68,7 +70,7 @@ async def create_session_endpoint(request: SessionRequest):
         New session state
     """
     try:
-        session = await create_session(request.goal, request.environment_config)
+        session = await create_session(request.goal, request.environment_config, request.provider, request.model)
         return session
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating session: {str(e)}")
@@ -347,3 +349,26 @@ DO NOT provide explanatory text without an action tag. This is NON-NEGOTIABLE.""
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing message: {str(e)}")
+
+
+class ApiKeyRequest(BaseModel):
+    provider: str
+    api_key: str
+
+
+@router.post("/set-api-key")
+async def set_api_key_endpoint(req: ApiKeyRequest):
+    """Set API key for a provider."""
+    set_api_key(req.provider, req.api_key)
+    return {"status": "ok"}
+
+
+class ResetKeyRequest(BaseModel):
+    provider: str
+
+
+@router.post("/reset-api-key")
+async def reset_api_key_endpoint(req: ResetKeyRequest):
+    """Reset API key for a provider."""
+    reset_api_key(req.provider)
+    return {"status": "ok"}

@@ -63,6 +63,19 @@ body {
     align-items: center;
 }
 
+.model-select-container {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+#model-select {
+    padding: 0.25rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
 #goal-input {
     flex: 1;
     padding: 0.5rem;

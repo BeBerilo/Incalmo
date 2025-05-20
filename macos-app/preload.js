@@ -24,7 +24,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   
   // Create a new session
-  createSession: async (goal) => {
+  createSession: async (goal, provider, model) => {
     const backendUrl = await ipcRenderer.invoke('get-backend-url');
     try {
       console.log(`Creating session with goal: ${goal}`);
@@ -35,7 +35,9 @@ contextBridge.exposeInMainWorld('api', {
         },
         body: JSON.stringify({
           goal: goal,
-          environment_config: null
+          environment_config: null,
+          provider: provider,
+          model: model
         }),
       });
       
@@ -93,6 +95,24 @@ contextBridge.exposeInMainWorld('api', {
     const backendUrl = await ipcRenderer.invoke('get-backend-url');
     const response = await fetch(`${backendUrl}/api/attack-graph/${sessionId}`);
     return response.json();
+  },
+
+  setApiKey: async (provider, key) => {
+    const backendUrl = await ipcRenderer.invoke('get-backend-url');
+    await fetch(`${backendUrl}/api/llm/set-api-key`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: provider, api_key: key })
+    });
+  },
+
+  resetApiKey: async (provider) => {
+    const backendUrl = await ipcRenderer.invoke('get-backend-url');
+    await fetch(`${backendUrl}/api/llm/reset-api-key`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: provider })
+    });
   },
   
   // Health check with retry logic

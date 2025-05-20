@@ -9,13 +9,50 @@ import os
 import re
 from typing import Dict, List, Any, Optional, Tuple
 import anthropic
+import openai
+import google.generativeai as genai
+import asyncio
 from models.models import LLMMessage, LLMRequest, LLMResponse, TaskType
 
 # Initialize Anthropic client
 # In production, use environment variables for API keys
-client = anthropic.Anthropic(
-    api_key=os.getenv("ANTHROPIC_API_KEY", "dummy_key_for_development")
-)
+
+# API keys for each provider
+API_KEYS = {
+    "anthropic": os.getenv("ANTHROPIC_API_KEY"),
+    "openai": os.getenv("OPENAI_API_KEY"),
+    "gemini": os.getenv("GEMINI_API_KEY"),
+}
+
+# Initialize Anthropic client lazily
+client = anthropic.Anthropic(api_key=API_KEYS.get("anthropic", "dummy_key_for_development"))
+
+
+def _env_var_name(provider: str) -> str:
+    return {
+        "anthropic": "ANTHROPIC_API_KEY",
+        "openai": "OPENAI_API_KEY",
+        "gemini": "GEMINI_API_KEY",
+    }.get(provider.lower())
+
+
+def set_api_key(provider: str, api_key: str) -> None:
+    """Set API key for a provider at runtime."""
+    env = _env_var_name(provider)
+    if env:
+        API_KEYS[provider] = api_key
+        os.environ[env] = api_key
+        if provider == "anthropic":
+            global client
+            client = anthropic.Anthropic(api_key=api_key)
+
+
+def reset_api_key(provider: str) -> None:
+    """Remove API key for a provider."""
+    env = _env_var_name(provider)
+    if env:
+        API_KEYS[provider] = None
+        os.environ.pop(env, None)
 
 # System prompt template for Incalmo
 SYSTEM_PROMPT_TEMPLATE = """
@@ -164,7 +201,7 @@ def extract_task_from_response(content: str) -> Tuple[Optional[TaskType], Option
     
     return None, None
 
-async def generate_response(messages: List[LLMMessage]) -> LLMResponse:
+async def generate_response(messages: List[LLMMessage], provider: str = "anthropic", model: str = "claude-3-7-sonnet-20250219") -> LLMResponse:
     """
     Generate a response from the LLM based on the conversation history.
     
@@ -184,33 +221,53 @@ async def generate_response(messages: List[LLMMessage]) -> LLMResponse:
         else:
             chat_messages.append({"role": msg.role, "content": msg.content})
     
-    print(f"[DEBUG] Calling Anthropic API with {len(chat_messages)} messages")
-    print(f"[DEBUG] System message length: {len(system_message) if system_message else 0}")
-    
-    # Check if API key is set
-    api_key = os.getenv("ANTHROPIC_API_KEY", "")
-    if not api_key or api_key == "dummy_key_for_development":
-        print("[ERROR] Anthropic API key is not set or is using the dummy value")
-        return LLMResponse(
-            content="Error: Anthropic API key is not properly configured. Please set the ANTHROPIC_API_KEY environment variable.",
-            task_type=None,
-            task_parameters=None
-        )
-    else:
-        print(f"[DEBUG] Using Anthropic API key: {api_key[:8]}...")
-    
+    print(f"[DEBUG] Using provider {provider} with {len(chat_messages)} messages")
+
     try:
-        # Call Anthropic API with system message as separate parameter
-        print("[DEBUG] Calling Anthropic API...")
-        response = client.messages.create(
-            model="claude-3-7-sonnet-20250219",  # Updated to the correct model name
-            max_tokens=1000,
-            temperature=0.7,
-            system=system_message,  # Pass system message separately
-            messages=chat_messages  # Only include user and assistant messages
-        )
-        
-        content = response.content[0].text
+        if provider == "anthropic":
+            api_key = API_KEYS.get("anthropic")
+            if not api_key:
+                return LLMResponse(content="Error: Anthropic API key is not configured.", task_type=None, task_parameters=None)
+            global client
+            client = anthropic.Anthropic(api_key=api_key)
+            response = client.messages.create(
+                model=model,
+                max_tokens=1000,
+                temperature=0.7,
+                system=system_message,
+                messages=chat_messages
+            )
+            content = response.content[0].text
+        elif provider == "openai":
+            api_key = API_KEYS.get("openai")
+            if not api_key:
+                return LLMResponse(content="Error: OpenAI API key is not configured.", task_type=None, task_parameters=None)
+            openai_client = openai.AsyncOpenAI(api_key=api_key)
+            response = await openai_client.chat.completions.create(
+                model=model,
+                messages=[{"role": "system", "content": system_message}] + chat_messages,
+                temperature=0.7,
+                max_tokens=1000,
+            )
+            content = response.choices[0].message.content
+        elif provider == "gemini":
+            api_key = API_KEYS.get("gemini")
+            if not api_key:
+                return LLMResponse(content="Error: Gemini API key is not configured.", task_type=None, task_parameters=None)
+            genai.configure(api_key=api_key)
+            loop = asyncio.get_event_loop()
+
+            user_content = "\n".join([m["content"] for m in chat_messages])
+
+            def run_sync():
+                model_obj = genai.GenerativeModel(model)
+                return model_obj.generate_content(user_content, system_instruction=system_message)
+
+            gem_resp = await loop.run_in_executor(None, run_sync)
+            content = gem_resp.text
+        else:
+            return LLMResponse(content="Error: Unsupported provider", task_type=None, task_parameters=None)
+
         print(f"[DEBUG] Received response from API: {content[:50]}...")
         
         task_type, task_parameters = extract_task_from_response(content)
@@ -237,7 +294,8 @@ async def generate_response(messages: List[LLMMessage]) -> LLMResponse:
             task_parameters=None
         )
         
-async def generate_streaming_response(messages: List[LLMMessage], session_id: str):
+async def generate_streaming_response(messages: List[LLMMessage], session_id: str,
+                                      provider: str = "anthropic", model: str = "claude-3-7-sonnet-20250219"):
     """
     Generate a streaming response from the LLM based on the conversation history.
     
@@ -260,22 +318,19 @@ async def generate_streaming_response(messages: List[LLMMessage], session_id: st
         else:
             chat_messages.append({"role": msg.role, "content": msg.content})
     
-    print(f"[DEBUG] Calling Anthropic API with {len(chat_messages)} messages (streaming)")
-    print(f"[DEBUG] System message length: {len(system_message) if system_message else 0}")
-    
-    # Check if API key is set
-    api_key = os.getenv("ANTHROPIC_API_KEY", "")
-    if not api_key or api_key == "dummy_key_for_development":
-        print("[ERROR] Anthropic API key is not set or is using the dummy value")
-        error_message = "Error: Anthropic API key is not properly configured. Please set the ANTHROPIC_API_KEY environment variable."
+    print(f"[DEBUG] Streaming using provider {provider}")
+    api_key = API_KEYS.get(provider)
+    if provider != "anthropic":
+        # For providers without streaming support, fall back to non-streaming
+        resp = await generate_response(messages, provider, model)
+        await websocket_manager.broadcast_llm_streaming_chunk(session_id, resp.content, True)
+        return resp
+    if not api_key:
+        error_message = "Error: Anthropic API key is not configured."
         await websocket_manager.broadcast_llm_streaming_chunk(session_id, error_message, True)
-        return LLMResponse(
-            content=error_message,
-            task_type=None,
-            task_parameters=None
-        )
-    else:
-        print(f"[DEBUG] Using Anthropic API key: {api_key[:8]}...")
+        return LLMResponse(content=error_message, task_type=None, task_parameters=None)
+    global client
+    client = anthropic.Anthropic(api_key=api_key)
     
     try:
         # Call Anthropic API with streaming enabled
@@ -283,7 +338,7 @@ async def generate_streaming_response(messages: List[LLMMessage], session_id: st
         
         full_content = ""
         with client.messages.stream(
-            model="claude-3-7-sonnet-20250219",
+            model=model,
             max_tokens=1000,
             temperature=0.7,
             system=system_message,

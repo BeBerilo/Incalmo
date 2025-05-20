@@ -14,10 +14,10 @@ from fastapi.responses import JSONResponse
 # Load environment variables
 load_dotenv()
 
-# Get API key from environment
+# Get API keys from environment
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-if not ANTHROPIC_API_KEY:
-    raise ValueError("ANTHROPIC_API_KEY environment variable is not set")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # Create FastAPI app
 app = FastAPI(
@@ -52,20 +52,9 @@ setup_core_routes(app)
 from websocket import setup_websocket_routes, websocket_manager
 setup_websocket_routes(app)
 
-# Add middleware to check for API key in requests
+# Simple middleware placeholder (kept for compatibility)
 @app.middleware("http")
 async def check_api_key(request: Request, call_next):
-    # Skip API key check for certain endpoints
-    if request.url.path in ["/", "/health", "/docs", "/openapi.json"] or request.url.path.startswith("/static"):
-        return await call_next(request)
-    
-    # For all other endpoints, ensure we have the API key in the environment
-    if not ANTHROPIC_API_KEY:
-        return JSONResponse(
-            status_code=500,
-            content={"detail": "API key configuration error"}
-        )
-    
     return await call_next(request)
 
 @app.get("/")
@@ -88,7 +77,9 @@ async def health_check():
 async def get_config():
     """Get frontend configuration without exposing sensitive information."""
     return {
-        "apiReady": bool(ANTHROPIC_API_KEY),
+        "anthropicReady": bool(ANTHROPIC_API_KEY),
+        "openaiReady": bool(OPENAI_API_KEY),
+        "geminiReady": bool(GEMINI_API_KEY),
         "wsEnabled": True,
         "version": "0.1.0"
     }
