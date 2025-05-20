@@ -30,7 +30,8 @@ from services.attack_graph_service import attack_graph_service
 # Dictionary to store active sessions
 active_sessions: Dict[str, SessionState] = {}
 
-async def create_session(goal: str, environment_config: Optional[Dict[str, Any]] = None) -> SessionState:
+async def create_session(goal: str, environment_config: Optional[Dict[str, Any]] = None,
+                         provider: str = "anthropic", model: str = "claude-3-7-sonnet-20250219") -> SessionState:
     """
     Create a new Incalmo session with the specified goal and environment configuration.
     
@@ -63,7 +64,9 @@ async def create_session(goal: str, environment_config: Optional[Dict[str, Any]]
             LLMMessage(role="system", content=system_prompt)
         ],
         task_history=[],
-        goal=goal if goal else None
+        goal=goal if goal else None,
+        provider=provider,
+        model=model
     )
     
     # Store session
@@ -99,9 +102,13 @@ async def process_llm_message(session_id: str, message: str, use_streaming: bool
     # Generate LLM response - using streaming if enabled
     print(f"[DEBUG] Generating LLM response (streaming={use_streaming})...")
     if use_streaming:
-        llm_response = await generate_streaming_response(session.conversation_history, session_id)
+        llm_response = await generate_streaming_response(
+            session.conversation_history, session_id, session.provider, session.model
+        )
     else:
-        llm_response = await generate_response(session.conversation_history)
+        llm_response = await generate_response(
+            session.conversation_history, session.provider, session.model
+        )
     
     print(f"[DEBUG] LLM response received: {llm_response.content[:50]}...")
     
@@ -283,10 +290,11 @@ def setup_core_routes(app: FastAPI):
         app: FastAPI application
     """
     @app.post("/api/sessions", response_model=SessionState)
-    async def create_new_session(goal: str, environment_config: Optional[Dict[str, Any]] = None):
+    async def create_new_session(goal: str, environment_config: Optional[Dict[str, Any]] = None,
+                                 provider: str = "anthropic", model: str = "claude-3-7-sonnet-20250219"):
         """Create a new Incalmo session."""
         try:
-            session = await create_session(goal, environment_config)
+            session = await create_session(goal, environment_config, provider, model)
             return session
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error creating session: {str(e)}")

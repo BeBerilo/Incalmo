@@ -121,6 +121,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Session controls
         goalInput: document.getElementById('goal-input'),
         createSessionBtn: document.getElementById('create-session-btn'),
+        modelSelect: document.getElementById('model-select'),
+        resetKeyBtn: document.getElementById('reset-key-btn'),
         sessionInfo: document.getElementById('session-info'),
         sessionIdSpan: document.getElementById('session-id'),
         sessionStatusSpan: document.getElementById('session-status'),
@@ -233,8 +235,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         elements.toggleTerminalBtn.addEventListener('click', toggleTerminal);
         elements.clearTerminalBtn.addEventListener('click', clearTerminal);
         
-        // Chat mode toggle
-        elements.toggleChatModeBtn.addEventListener('click', toggleChatMode);
+       // Chat mode toggle
+       elements.toggleChatModeBtn.addEventListener('click', toggleChatMode);
+
+        elements.modelSelect.addEventListener('change', async () => {
+            const [provider] = elements.modelSelect.value.split('/');
+            if (!localStorage.getItem(`apiKey_${provider}`)) {
+                const key = prompt(`Enter API key for ${provider}`);
+                if (key) {
+                    localStorage.setItem(`apiKey_${provider}`, key);
+                    await window.api.setApiKey(provider, key);
+                }
+            }
+        });
+
+        elements.resetKeyBtn.addEventListener('click', async () => {
+            const [provider] = elements.modelSelect.value.split('/');
+            localStorage.removeItem(`apiKey_${provider}`);
+            await window.api.resetApiKey(provider);
+            alert('API key reset for ' + provider);
+        });
         
         // Note: Log controls are hidden in the simplified UI
         // These log-related elements don't exist in this version of the app
@@ -264,7 +284,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Remove the initial welcome message when starting
             clearChat();
             
-            const response = await window.api.createSession(goal);
+            const [provider, model] = elements.modelSelect.value.split('/');
+            if (!localStorage.getItem(`apiKey_${provider}`)) {
+                const key = prompt(`Enter API key for ${provider}`);
+                if (!key) {
+                    throw new Error('API key required');
+                }
+                localStorage.setItem(`apiKey_${provider}`, key);
+                await window.api.setApiKey(provider, key);
+            }
+            const response = await window.api.createSession(goal, provider, model);
             console.log("Session creation response:", response);
             
             if (!response || !response.id) {

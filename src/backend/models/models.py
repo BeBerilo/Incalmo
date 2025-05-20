@@ -34,6 +34,7 @@ class LLMRequest(BaseModel):
     max_tokens: Optional[int] = Field(1000, description="Maximum number of tokens to generate")
     temperature: Optional[float] = Field(0.7, description="Temperature for response generation")
     model: str = Field("claude-3-7-sonnet-20250219", description="Model to use for generation")
+    provider: str = Field("anthropic", description="LLM provider (anthropic, openai, gemini)")
 
 
 class LLMResponse(BaseModel):
@@ -123,6 +124,8 @@ class SessionState(BaseModel):
     created_at: datetime = Field(default_factory=datetime.now, description="Timestamp of session creation")
     updated_at: datetime = Field(default_factory=datetime.now, description="Timestamp of last session update")
     goal: Optional[str] = Field(None, description="The goal for this session if in autonomous mode")
+    provider: str = Field("anthropic", description="LLM provider for this session")
+    model: str = Field("claude-3-7-sonnet-20250219", description="Model used for this session")
 
     @field_serializer('created_at', 'updated_at')
     def serialize_dt(self, dt: datetime):
