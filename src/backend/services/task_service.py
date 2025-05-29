@@ -18,13 +18,60 @@ class TaskTranslationService:
         """Initialize the task translation service."""
         # Register task handlers
         self.task_handlers = {
+            # Network and Host Discovery
             TaskType.SCAN_NETWORK: self._handle_scan_network,
+            TaskType.SCAN_PORT: self._handle_scan_port,
+            TaskType.DISCOVER_SERVICES: self._handle_discover_services,
+            TaskType.ENUMERATE_USERS: self._handle_enumerate_users,
+            
+            # Vulnerability Assessment
+            TaskType.SCAN_VULNERABILITIES: self._handle_scan_vulnerabilities,
+            TaskType.ANALYZE_WEB_APP: self._handle_analyze_web_app,
+            TaskType.TEST_DEFAULT_CREDS: self._handle_test_default_creds,
+            TaskType.CHECK_MISCONFIGURATIONS: self._handle_check_misconfigurations,
+            
+            # Exploitation and Access
             TaskType.INFECT_HOST: self._handle_infect_host,
             TaskType.LATERAL_MOVE: self._handle_lateral_move,
             TaskType.ESCALATE_PRIVILEGE: self._handle_escalate_privilege,
+            TaskType.BRUTE_FORCE_AUTH: self._handle_brute_force_auth,
+            TaskType.EXPLOIT_VULNERABILITY: self._handle_exploit_vulnerability,
+            
+            # Data Operations
             TaskType.EXFILTRATE_DATA: self._handle_exfiltrate_data,
+            TaskType.COLLECT_SYSTEM_INFO: self._handle_collect_system_info,
+            TaskType.DUMP_CREDENTIALS: self._handle_dump_credentials,
+            TaskType.ACCESS_FILES: self._handle_access_files,
+            
+            # Network Operations
+            TaskType.NETWORK_PIVOTING: self._handle_network_pivoting,
+            TaskType.TRAFFIC_ANALYSIS: self._handle_traffic_analysis,
+            TaskType.MITM_ATTACK: self._handle_mitm_attack,
+            
+            # Tools Management
+            TaskType.INSTALL_TOOL: self._handle_install_tool,
+            TaskType.CHECK_TOOL_AVAILABILITY: self._handle_check_tool_availability,
+            TaskType.UPDATE_TOOLS: self._handle_update_tools,
+            
+            # System Operations
             TaskType.EXECUTE_COMMAND: self._handle_execute_command,
-            TaskType.FINISHED: self._handle_finished
+            TaskType.MONITOR_SYSTEM: self._handle_monitor_system,
+            TaskType.SETUP_PERSISTENCE: self._handle_setup_persistence,
+            
+            # Action Planning
+            TaskType.PLAN_ACTIONS: self._handle_plan_actions,
+            TaskType.VALIDATE_GOAL: self._handle_validate_goal,
+            TaskType.FINISHED: self._handle_finished,
+            
+            # PTES Framework Management
+            TaskType.ADVANCE_PTES_PHASE: self._handle_advance_ptes_phase,
+            TaskType.REVIEW_PHASE_OBJECTIVES: self._handle_review_phase_objectives,
+            TaskType.COMPLETE_PHASE: self._handle_complete_phase,
+            
+            # OWASP Framework Management
+            TaskType.ADVANCE_OWASP_PHASE: self._handle_advance_owasp_phase,
+            TaskType.REVIEW_OWASP_OBJECTIVES: self._handle_review_owasp_objectives,
+            TaskType.COMPLETE_OWASP_PHASE: self._handle_complete_owasp_phase
         }
     
     async def execute_task(self, task_type: TaskType, parameters: Dict[str, Any], 
@@ -64,10 +111,10 @@ class TaskTranslationService:
     async def _handle_scan_network(self, parameters: Dict[str, Any], 
                                  environment_state: EnvironmentState) -> TaskResult:
         """
-        Handle the scan_network task using actual terminal commands.
+        Handle the scan_network task by executing the LLM's specified command or providing intelligent defaults.
         
         Args:
-            parameters: Parameters for the task (e.g., target network)
+            parameters: Parameters for the task (e.g., command, target, method)
             environment_state: Current state of the environment
             
         Returns:
@@ -80,12 +127,20 @@ class TaskTranslationService:
         import uuid
         import socket
         
-        # Extract parameters - support both parameter naming conventions
+        # Check if the LLM provided a specific command to execute
+        if "command" in parameters:
+            # Execute the specific command requested by the LLM
+            return await self._handle_execute_command(parameters, environment_state)
+        
+        # Extract parameters
         target_network = parameters.get("network", parameters.get("target", ""))
         scan_type = parameters.get("scan_type", "basic")
+        method = parameters.get("method", "auto")  # Allow LLM to specify method
+        tool = parameters.get("tool", "auto")      # Allow LLM to specify tool
         
-        # Command selection based on available tools and scan type
-        try:
+        # If LLM specified a specific tool, try to use it
+        cmd = None
+        if tool == "nmap" or (tool == "auto"):
             # Check if nmap is available
             nmap_check = await asyncio.create_subprocess_shell(
                 "which nmap", stdout=subprocess.PIPE, stderr=subprocess.PIPE
@@ -93,32 +148,38 @@ class TaskTranslationService:
             nmap_stdout, _ = await nmap_check.communicate()
             
             if nmap_check.returncode == 0:
-                # Use nmap for scanning if available
+                # Build nmap command based on parameters
                 if scan_type == "aggressive":
-                    # Aggressive scan with OS detection, version detection, script scanning, and traceroute
                     cmd = f"nmap -A -T4 {target_network}"
+                elif scan_type == "comprehensive":
+                    cmd = f"nmap -sS -sV -O -A {target_network}"
                 else:
-                    # Basic scan - just ping sweep and basic port scan
                     cmd = f"nmap -sn {target_network}"
-            else:
-                # Fallback to simple ping sweep using ping
-                if target_network:
-                    # Extract network address for ping sweep
+        
+        # Fallback options if nmap not available or specified
+        if not cmd and (tool == "ping" or tool == "auto"):
+            if target_network:
+                try:
                     network = ipaddress.IPv4Network(target_network, strict=False)
                     base_ip = str(network.network_address).split('.')
-                    base_ip.pop()  # Remove last octet
+                    base_ip.pop()
                     base = '.'.join(base_ip)
                     
-                    # Create ping commands for first 10 addresses (to avoid too many pings)
-                    commands = []
-                    for i in range(1, 10):
-                        commands.append(f"ping -c 1 -W 1 {base}.{i}")
-                    
+                    # Ping sweep for first 10 addresses
+                    commands = [f"ping -c 1 -W 1 {base}.{i}" for i in range(1, 11)]
                     cmd = " & ".join(commands)
-                else:
-                    # No network specified, try local network
-                    cmd = "ping -c 1 -W 1 192.168.1.1 & ping -c 1 -W 1 192.168.1.254"
-            
+                except:
+                    cmd = "ping -c 1 -W 1 192.168.1.1"
+        
+        if not cmd:
+            return TaskResult(
+                task_type=TaskType.SCAN_NETWORK,
+                success=False,
+                error=f"Unable to determine appropriate scanning method for tool: {tool}",
+                result={"available_tools": ["nmap", "ping"], "requested_tool": tool}
+            )
+        
+        try:
             # Execute the command
             proc = await asyncio.create_subprocess_shell(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
@@ -986,6 +1047,9 @@ class TaskTranslationService:
             )
         
         try:
+            # Log the command being executed for visibility
+            print(f"[COMMAND EXECUTION] Running: {command}")
+            
             # Execute the command
             proc = await asyncio.create_subprocess_shell(
                 command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
@@ -1025,7 +1089,8 @@ class TaskTranslationService:
                 result={
                     "command": command,
                     "exit_code": proc.returncode,
-                    "output": combined_output
+                    "output": combined_output,
+                    "command_executed": f"[COMMAND EXECUTION] Running: {command}"
                 }
             )
             
@@ -1142,6 +1207,590 @@ class TaskTranslationService:
                 "reason": reason,
                 "compromised_hosts": len(environment_state.compromised_hosts),
                 "exfiltrated_data_items": len(environment_state.exfiltrated_data)
+            }
+        )
+
+    async def _handle_scan_port(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        """Handle port scanning task."""
+        if "command" in parameters:
+            return await self._handle_execute_command(parameters, environment_state)
+        
+        host = parameters.get("host", parameters.get("target", ""))
+        port_range = parameters.get("port_range", "1-1000")
+        tool = parameters.get("tool", "nmap")
+        
+        if not host:
+            return TaskResult(
+                task_type=TaskType.SCAN_PORT,
+                success=False,
+                error="No host specified for port scan",
+                result={"suggestion": "Provide 'host' or 'target' parameter or use 'command' parameter for custom command"}
+            )
+        
+        # Simple command construction - let LLM specify more complex commands if needed
+        if tool == "nmap":
+            cmd = f"nmap -p {port_range} {host}"
+        else:
+            cmd = f"nc -zv {host} {port_range.split('-')[0]}-{port_range.split('-')[1]}"
+        
+        return await self._handle_execute_command({"command": cmd}, environment_state)
+    
+    async def _handle_discover_services(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        """Handle service discovery task."""
+        if "command" in parameters:
+            return await self._handle_execute_command(parameters, environment_state)
+        
+        host = parameters.get("host", parameters.get("target", ""))
+        if not host:
+            return TaskResult(
+                task_type=TaskType.DISCOVER_SERVICES,
+                success=False,
+                error="No host specified for service discovery",
+                result={"suggestion": "Provide 'host' or 'target' parameter or use 'command' parameter"}
+            )
+        
+        cmd = f"nmap -sV {host}"
+        return await self._handle_execute_command({"command": cmd}, environment_state)
+    
+    # Generic handler for unimplemented tasks
+    async def _create_generic_handler(self, task_type: TaskType):
+        """Create a generic handler for tasks that delegates to execute_command."""
+        async def generic_handler(parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+            if "command" in parameters:
+                return await self._handle_execute_command(parameters, environment_state)
+            else:
+                return TaskResult(
+                    task_type=task_type,
+                    success=False,
+                    error=f"Task {task_type.value} requires a specific 'command' parameter",
+                    result={
+                        "suggestion": f"Use execute_command task with a specific command, or provide a 'command' parameter to {task_type.value}",
+                        "example": f'{{"task": "{task_type.value}", "parameters": {{"command": "your_command_here"}}}}'
+                    }
+                )
+        return generic_handler
+    
+    # Add generic handlers for all missing task types
+    async def _handle_enumerate_users(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        return await (await self._create_generic_handler(TaskType.ENUMERATE_USERS))(parameters, environment_state)
+    
+    async def _handle_scan_vulnerabilities(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        return await (await self._create_generic_handler(TaskType.SCAN_VULNERABILITIES))(parameters, environment_state)
+    
+    async def _handle_analyze_web_app(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        return await (await self._create_generic_handler(TaskType.ANALYZE_WEB_APP))(parameters, environment_state)
+    
+    async def _handle_test_default_creds(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        return await (await self._create_generic_handler(TaskType.TEST_DEFAULT_CREDS))(parameters, environment_state)
+    
+    async def _handle_check_misconfigurations(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        return await (await self._create_generic_handler(TaskType.CHECK_MISCONFIGURATIONS))(parameters, environment_state)
+    
+    async def _handle_brute_force_auth(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        return await (await self._create_generic_handler(TaskType.BRUTE_FORCE_AUTH))(parameters, environment_state)
+    
+    async def _handle_exploit_vulnerability(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        return await (await self._create_generic_handler(TaskType.EXPLOIT_VULNERABILITY))(parameters, environment_state)
+    
+    async def _handle_collect_system_info(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        return await (await self._create_generic_handler(TaskType.COLLECT_SYSTEM_INFO))(parameters, environment_state)
+    
+    async def _handle_dump_credentials(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        return await (await self._create_generic_handler(TaskType.DUMP_CREDENTIALS))(parameters, environment_state)
+    
+    async def _handle_access_files(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        return await (await self._create_generic_handler(TaskType.ACCESS_FILES))(parameters, environment_state)
+    
+    async def _handle_network_pivoting(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        return await (await self._create_generic_handler(TaskType.NETWORK_PIVOTING))(parameters, environment_state)
+    
+    async def _handle_traffic_analysis(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        return await (await self._create_generic_handler(TaskType.TRAFFIC_ANALYSIS))(parameters, environment_state)
+    
+    async def _handle_mitm_attack(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        return await (await self._create_generic_handler(TaskType.MITM_ATTACK))(parameters, environment_state)
+    
+    async def _handle_install_tool(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        """Handle tool installation - supports macOS package managers."""
+        if "command" in parameters:
+            return await self._handle_execute_command(parameters, environment_state)
+        
+        tool_name = parameters.get("tool", parameters.get("name", ""))
+        if not tool_name:
+            return TaskResult(
+                task_type=TaskType.INSTALL_TOOL,
+                success=False,
+                error="No tool specified for installation",
+                result={"suggestion": "Provide 'tool' or 'name' parameter"}
+            )
+        
+        # Try different package managers on macOS
+        managers = [
+            f"brew install {tool_name}",
+            f"port install {tool_name}",
+            f"pip3 install {tool_name}",
+            f"npm install -g {tool_name}"
+        ]
+        
+        for cmd in managers:
+            result = await self._handle_execute_command({"command": f"which {cmd.split()[0]}"}, environment_state)
+            if result.success:
+                return await self._handle_execute_command({"command": cmd}, environment_state)
+        
+        return TaskResult(
+            task_type=TaskType.INSTALL_TOOL,
+            success=False,
+            error="No package manager found",
+            result={"suggestion": "Install brew, macports, pip, or npm first"}
+        )
+    
+    async def _handle_check_tool_availability(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        """Check if a tool is available."""
+        if "command" in parameters:
+            return await self._handle_execute_command(parameters, environment_state)
+        
+        tool_name = parameters.get("tool", parameters.get("name", ""))
+        if not tool_name:
+            return TaskResult(
+                task_type=TaskType.CHECK_TOOL_AVAILABILITY,
+                success=False,
+                error="No tool specified",
+                result={"suggestion": "Provide 'tool' or 'name' parameter"}
+            )
+        
+        cmd = f"which {tool_name}"
+        return await self._handle_execute_command({"command": cmd}, environment_state)
+    
+    async def _handle_update_tools(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        return await (await self._create_generic_handler(TaskType.UPDATE_TOOLS))(parameters, environment_state)
+    
+    async def _handle_monitor_system(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        return await (await self._create_generic_handler(TaskType.MONITOR_SYSTEM))(parameters, environment_state)
+    
+    async def _handle_setup_persistence(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        return await (await self._create_generic_handler(TaskType.SETUP_PERSISTENCE))(parameters, environment_state)
+    
+    async def _handle_plan_actions(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        """Handle action planning."""
+        goal = parameters.get("goal", "")
+        steps = parameters.get("steps", [])
+        
+        return TaskResult(
+            task_type=TaskType.PLAN_ACTIONS,
+            success=True,
+            result={
+                "goal": goal,
+                "planned_steps": steps,
+                "message": "Action plan created. Use other tasks to execute the planned steps."
+            }
+        )
+    
+    async def _handle_validate_goal(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        """Validate if goal has been achieved."""
+        goal = parameters.get("goal", "")
+        criteria = parameters.get("criteria", [])
+        
+        return TaskResult(
+            task_type=TaskType.VALIDATE_GOAL,
+            success=True,
+            result={
+                "goal": goal,
+                "criteria": criteria,
+                "validation_status": "manual_review_required",
+                "message": "Goal validation completed. Review results to determine if goal is achieved."
+            }
+        )
+    
+    async def _handle_advance_ptes_phase(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        """Advance to the next PTES phase."""
+        from models.models import PTESPhase
+        
+        # Mapping from human-readable names to enum values
+        phase_name_mapping = {
+            "pre-engagement": PTESPhase.PRE_ENGAGEMENT,
+            "pre engagement": PTESPhase.PRE_ENGAGEMENT,
+            "pre-engagement interactions": PTESPhase.PRE_ENGAGEMENT,
+            "pre engagement interactions": PTESPhase.PRE_ENGAGEMENT,
+            "preengagement": PTESPhase.PRE_ENGAGEMENT,
+            "intelligence gathering": PTESPhase.INTELLIGENCE_GATHERING,
+            "intelligence-gathering": PTESPhase.INTELLIGENCE_GATHERING,
+            "intelligencegathering": PTESPhase.INTELLIGENCE_GATHERING,
+            "threat modeling": PTESPhase.THREAT_MODELING,
+            "threat-modeling": PTESPhase.THREAT_MODELING,
+            "threatmodeling": PTESPhase.THREAT_MODELING,
+            "vulnerability analysis": PTESPhase.VULNERABILITY_ANALYSIS,
+            "vulnerability-analysis": PTESPhase.VULNERABILITY_ANALYSIS,
+            "vulnerabilityanalysis": PTESPhase.VULNERABILITY_ANALYSIS,
+            "exploitation": PTESPhase.EXPLOITATION,
+            "post-exploitation": PTESPhase.POST_EXPLOITATION,
+            "post exploitation": PTESPhase.POST_EXPLOITATION,
+            "postexploitation": PTESPhase.POST_EXPLOITATION,
+            "reporting": PTESPhase.REPORTING
+        }
+        
+        def normalize_phase_name(phase_name: str) -> str:
+            """Convert human-readable phase name to enum value."""
+            if not phase_name:
+                return "pre_engagement"
+            
+            # First try direct enum value
+            try:
+                PTESPhase(phase_name)
+                return phase_name
+            except ValueError:
+                pass
+            
+            # Try mapping from human-readable names
+            normalized = phase_name.lower().strip()
+            if normalized in phase_name_mapping:
+                return phase_name_mapping[normalized].value
+            
+            # Fallback to pre_engagement
+            return "pre_engagement"
+        
+        # Get and normalize phase parameters
+        current_phase_param = parameters.get("current_phase", "pre_engagement")
+        next_phase_param = parameters.get("next_phase", "")
+        
+        # Also check for direct phase parameter (sometimes LLM passes just "phase")
+        if not next_phase_param and "phase" in parameters:
+            next_phase_param = parameters.get("phase", "")
+        
+        current_phase = normalize_phase_name(current_phase_param)
+        next_phase = normalize_phase_name(next_phase_param)
+        
+        print(f"[PTES DEBUG] Received params: current_phase_param='{current_phase_param}', next_phase_param='{next_phase_param}'")
+        print(f"[PTES DEBUG] Normalized: current_phase='{current_phase}', next_phase='{next_phase}'")
+        
+        # Define phase progression
+        phase_order = [
+            PTESPhase.PRE_ENGAGEMENT,
+            PTESPhase.INTELLIGENCE_GATHERING,
+            PTESPhase.THREAT_MODELING,
+            PTESPhase.VULNERABILITY_ANALYSIS,
+            PTESPhase.EXPLOITATION,
+            PTESPhase.POST_EXPLOITATION,
+            PTESPhase.REPORTING
+        ]
+        
+        try:
+            current_idx = phase_order.index(PTESPhase(current_phase))
+            if next_phase:
+                next_idx = phase_order.index(PTESPhase(next_phase))
+            else:
+                next_idx = current_idx + 1
+            
+            if next_idx >= len(phase_order):
+                return TaskResult(
+                    task_type=TaskType.ADVANCE_PTES_PHASE,
+                    success=False,
+                    error="Already at final phase (Reporting)",
+                    result={"current_phase": current_phase}
+                )
+            
+            new_phase = phase_order[next_idx]
+            
+            # Define objectives for each phase
+            phase_objectives = {
+                PTESPhase.PRE_ENGAGEMENT: [
+                    "Define assessment scope and objectives",
+                    "Establish rules of engagement",
+                    "Confirm authorization and legal boundaries"
+                ],
+                PTESPhase.INTELLIGENCE_GATHERING: [
+                    "Perform passive reconnaissance",
+                    "Conduct active information gathering",
+                    "Map network topology and services"
+                ],
+                PTESPhase.THREAT_MODELING: [
+                    "Identify potential attack vectors",
+                    "Analyze threat landscape",
+                    "Prioritize attack paths"
+                ],
+                PTESPhase.VULNERABILITY_ANALYSIS: [
+                    "Discover security vulnerabilities",
+                    "Classify and prioritize findings",
+                    "Assess exploitability"
+                ],
+                PTESPhase.EXPLOITATION: [
+                    "Validate vulnerabilities through controlled exploitation",
+                    "Demonstrate business impact",
+                    "Gain initial access where authorized"
+                ],
+                PTESPhase.POST_EXPLOITATION: [
+                    "Assess depth of compromise",
+                    "Evaluate privilege escalation potential",
+                    "Test lateral movement capabilities"
+                ],
+                PTESPhase.REPORTING: [
+                    "Document all findings with evidence",
+                    "Provide remediation recommendations",
+                    "Deliver comprehensive assessment report"
+                ]
+            }
+            
+            return TaskResult(
+                task_type=TaskType.ADVANCE_PTES_PHASE,
+                success=True,
+                result={
+                    "previous_phase": current_phase,
+                    "new_phase": new_phase.value,
+                    "phase_name": new_phase.value.replace('_', ' ').title(),
+                    "objectives": phase_objectives.get(new_phase, []),
+                    "message": f"Advanced from {current_phase.replace('_', ' ').title()} to {new_phase.value.replace('_', ' ').title()} phase"
+                }
+            )
+            
+        except ValueError as e:
+            return TaskResult(
+                task_type=TaskType.ADVANCE_PTES_PHASE,
+                success=False,
+                error=f"Invalid phase: {str(e)}",
+                result={"current_phase": current_phase}
+            )
+    
+    async def _handle_review_phase_objectives(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        """Review current phase objectives and progress."""
+        phase = parameters.get("phase", "pre_engagement")
+        completed_objectives = parameters.get("completed", [])
+        
+        return TaskResult(
+            task_type=TaskType.REVIEW_PHASE_OBJECTIVES,
+            success=True,
+            result={
+                "phase": phase,
+                "phase_name": phase.replace('_', ' ').title(),
+                "completed_objectives": completed_objectives,
+                "message": "Phase objectives reviewed. Use this information to determine next steps."
+            }
+        )
+    
+    async def _handle_complete_phase(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        """Mark current phase as complete with findings."""
+        phase = parameters.get("phase", "")
+        findings = parameters.get("findings", {})
+        summary = parameters.get("summary", "")
+        
+        return TaskResult(
+            task_type=TaskType.COMPLETE_PHASE,
+            success=True,
+            result={
+                "completed_phase": phase,
+                "phase_name": phase.replace('_', ' ').title(),
+                "findings": findings,
+                "summary": summary,
+                "message": f"Phase {phase.replace('_', ' ').title()} completed with findings documented"
+            }
+        )
+
+    async def _handle_advance_owasp_phase(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        """Advance to the next OWASP phase."""
+        from models.models import OWASPPhase
+        
+        # Mapping from human-readable names to enum values
+        phase_name_mapping = {
+            "information gathering": OWASPPhase.INFORMATION_GATHERING,
+            "information-gathering": OWASPPhase.INFORMATION_GATHERING,
+            "configuration testing": OWASPPhase.CONFIGURATION_TESTING,
+            "configuration-testing": OWASPPhase.CONFIGURATION_TESTING,
+            "identity management": OWASPPhase.IDENTITY_MANAGEMENT,
+            "identity-management": OWASPPhase.IDENTITY_MANAGEMENT,
+            "authentication testing": OWASPPhase.AUTHENTICATION_TESTING,
+            "authentication-testing": OWASPPhase.AUTHENTICATION_TESTING,
+            "authorization testing": OWASPPhase.AUTHORIZATION_TESTING,
+            "authorization-testing": OWASPPhase.AUTHORIZATION_TESTING,
+            "session management": OWASPPhase.SESSION_MANAGEMENT,
+            "session-management": OWASPPhase.SESSION_MANAGEMENT,
+            "input validation": OWASPPhase.INPUT_VALIDATION,
+            "input-validation": OWASPPhase.INPUT_VALIDATION,
+            "error handling": OWASPPhase.ERROR_HANDLING,
+            "error-handling": OWASPPhase.ERROR_HANDLING,
+            "cryptography": OWASPPhase.CRYPTOGRAPHY,
+            "business logic": OWASPPhase.BUSINESS_LOGIC,
+            "business-logic": OWASPPhase.BUSINESS_LOGIC,
+            "client side": OWASPPhase.CLIENT_SIDE,
+            "client-side": OWASPPhase.CLIENT_SIDE,
+        }
+        
+        def normalize_owasp_phase_name(phase_name: str) -> str:
+            """Convert human-readable phase name to enum value."""
+            if not phase_name:
+                return "information_gathering"
+            
+            # First try direct enum value
+            try:
+                OWASPPhase(phase_name)
+                return phase_name
+            except ValueError:
+                pass
+            
+            # Try mapping from human-readable names
+            normalized = phase_name.lower().strip()
+            if normalized in phase_name_mapping:
+                return phase_name_mapping[normalized].value
+            
+            # Fallback to information_gathering
+            return "information_gathering"
+        
+        current_phase = normalize_owasp_phase_name(parameters.get("current_phase", "information_gathering"))
+        next_phase = normalize_owasp_phase_name(parameters.get("next_phase", ""))
+        
+        print(f"[OWASP DEBUG] Received params: current_phase='{parameters.get('current_phase', '')}', next_phase='{parameters.get('next_phase', '')}'")
+        print(f"[OWASP DEBUG] Normalized: current_phase='{current_phase}', next_phase='{next_phase}'")
+        
+        # Define phase progression
+        phase_order = [
+            OWASPPhase.INFORMATION_GATHERING,
+            OWASPPhase.CONFIGURATION_TESTING,
+            OWASPPhase.IDENTITY_MANAGEMENT,
+            OWASPPhase.AUTHENTICATION_TESTING,
+            OWASPPhase.AUTHORIZATION_TESTING,
+            OWASPPhase.SESSION_MANAGEMENT,
+            OWASPPhase.INPUT_VALIDATION,
+            OWASPPhase.ERROR_HANDLING,
+            OWASPPhase.CRYPTOGRAPHY,
+            OWASPPhase.BUSINESS_LOGIC,
+            OWASPPhase.CLIENT_SIDE
+        ]
+        
+        try:
+            current_idx = phase_order.index(OWASPPhase(current_phase))
+            if next_phase:
+                next_idx = phase_order.index(OWASPPhase(next_phase))
+            else:
+                next_idx = current_idx + 1
+            
+            if next_idx >= len(phase_order):
+                return TaskResult(
+                    task_type=TaskType.ADVANCE_OWASP_PHASE,
+                    success=False,
+                    error="Already at final phase (Client Side Testing)",
+                    result={"current_phase": current_phase}
+                )
+            
+            new_phase = phase_order[next_idx]
+            
+            print(f"[OWASP DEBUG] Advanced to OWASP phase: {new_phase.value}")
+            
+            return TaskResult(
+                task_type=TaskType.ADVANCE_OWASP_PHASE,
+                success=True,
+                result={
+                    "previous_phase": current_phase,
+                    "new_phase": new_phase.value,
+                    "phase_name": new_phase.value.replace('_', ' ').title(),
+                    "message": f"Advanced from {current_phase.replace('_', ' ').title()} to {new_phase.value.replace('_', ' ').title()} phase"
+                }
+            )
+            
+        except ValueError as e:
+            return TaskResult(
+                task_type=TaskType.ADVANCE_OWASP_PHASE,
+                success=False,
+                error=f"Invalid phase: '{current_phase}' or '{next_phase}' is not a valid OWASPPhase",
+                result={"current_phase": current_phase, "next_phase": next_phase}
+            )
+
+    async def _handle_review_owasp_objectives(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        """Review current OWASP phase objectives."""
+        phase = parameters.get("phase", "information_gathering")
+        
+        # Define objectives for each OWASP phase
+        phase_objectives = {
+            "information_gathering": [
+                "Conduct search engine discovery and reconnaissance",
+                "Fingerprint web server and framework",
+                "Review webserver metafiles for information leakage",
+                "Enumerate applications on webserver",
+                "Review webpage comments and metadata for information leakage",
+                "Identify application entry points"
+            ],
+            "configuration_testing": [
+                "Test network/infrastructure configuration",
+                "Test application platform configuration",
+                "Test file extensions handling for sensitive information",
+                "Review old, backup and unreferenced files for sensitive information",
+                "Test for administrative interfaces",
+                "Test HTTP methods and verify HTTPS configuration"
+            ],
+            "identity_management": [
+                "Test role definitions and user registration process",
+                "Test account provisioning and de-provisioning process",
+                "Test for account enumeration and guessable user accounts",
+                "Test for weak or unenforced username policy"
+            ],
+            "authentication_testing": [
+                "Test for credentials transported over encrypted channel",
+                "Test for default credentials and weak password policy",
+                "Test for weak lock out mechanism and bypassing authentication schema",
+                "Test for vulnerable remember password and browser cache weaknesses",
+                "Test for weak password change or reset functionalities"
+            ],
+            "authorization_testing": [
+                "Test directory traversal and file include",
+                "Test for bypassing authorization schema and privilege escalation",
+                "Test for insecure direct object references"
+            ],
+            "session_management": [
+                "Test for session management schema and cookies attributes",
+                "Test for session fixation and exposed session variables",
+                "Test for Cross Site Request Forgery (CSRF)",
+                "Test for logout functionality and session timeout"
+            ],
+            "input_validation": [
+                "Test for reflected, stored, and DOM-based Cross Site Scripting",
+                "Test for SQL, LDAP, ORM, XML injection",
+                "Test for SSI injection, XPath injection, and IMAP/SMTP injection",
+                "Test for code injection and command injection",
+                "Test for buffer overflow and incubated vulnerability",
+                "Test for HTTP splitting/smuggling"
+            ],
+            "error_handling": [
+                "Test for improper error handling and stack traces"
+            ],
+            "cryptography": [
+                "Test for weak SSL/TLS ciphers and certificates",
+                "Test for sensitive information sent via unencrypted channels"
+            ],
+            "business_logic": [
+                "Test business logic data validation and integrity checks",
+                "Test for the circumvention of work flows",
+                "Test defenses against application misuse"
+            ],
+            "client_side": [
+                "Test for DOM manipulation and HTML injection",
+                "Test for client side URL redirect and client side resource manipulation"
+            ]
+        }
+        
+        objectives = phase_objectives.get(phase, [])
+        
+        return TaskResult(
+            task_type=TaskType.REVIEW_OWASP_OBJECTIVES,
+            success=True,
+            result={
+                "phase": phase,
+                "phase_name": phase.replace('_', ' ').title(),
+                "objectives": objectives,
+                "message": f"Current phase: {phase.replace('_', ' ').title()}. Review objectives and continue testing."
+            }
+        )
+
+    async def _handle_complete_owasp_phase(self, parameters: Dict[str, Any], environment_state: EnvironmentState) -> TaskResult:
+        """Mark current OWASP phase as complete with findings."""
+        phase = parameters.get("phase", "")
+        findings = parameters.get("findings", {})
+        summary = parameters.get("summary", "")
+        
+        return TaskResult(
+            task_type=TaskType.COMPLETE_OWASP_PHASE,
+            success=True,
+            result={
+                "completed_phase": phase,
+                "phase_name": phase.replace('_', ' ').title(),
+                "findings": findings,
+                "summary": summary,
+                "message": f"OWASP Phase {phase.replace('_', ' ').title()} completed with findings documented"
             }
         )
 

@@ -1,6 +1,6 @@
 // Renderer process script for Incalmo desktop application
 
-// Extract command from action tags - only handle actual commands
+// Extract task information from action tags - show all task types
 function extractCommandFromAction(content) {
     try {
         // Look for action tags
@@ -13,17 +13,120 @@ function extractCommandFromAction(content) {
         try {
             const actionJson = JSON.parse(actionContent);
             
+            // Handle different task types and show the actual command being executed
+            if (actionJson.task || actionJson.TASK) {
+                const taskType = actionJson.task || actionJson.TASK;
+                const params = actionJson.parameters || {};
+                
+                // First check if we have the actual command being executed
+                if (params.command_executed) {
+                    return `Running command: ${params.command_executed}`;
+                }
+                
+                if (params.command) {
+                    return `Running command: ${params.command}`;
+                }
+                
+                // Generate the likely command based on task type and parameters
+                switch (taskType.toLowerCase()) {
+                    case 'execute_command':
+                        return `Running command: ${params.command || 'unknown command'}`;
+                    
+                    case 'scan_network':
+                        const target = params.target || params.network || 'unknown target';
+                        const scanType = params.scan_type || 'basic';
+                        if (scanType === 'aggressive') {
+                            return `Running command: nmap -A -T4 ${target}`;
+                        } else {
+                            return `Running command: nmap -sn ${target}`;
+                        }
+                    
+                    case 'scan_port':
+                        const portTarget = params.target || 'localhost';
+                        const ports = params.ports || '1-1000';
+                        const portScanType = params.scan_type || 'tcp';
+                        if (portScanType === 'udp') {
+                            return `Running command: nmap -sU -p ${ports} ${portTarget}`;
+                        } else {
+                            return `Running command: nmap -sS -p ${ports} ${portTarget}`;
+                        }
+                    
+                    case 'discover_services':
+                        return `Running command: nmap -sV ${params.target || 'localhost'}`;
+                    
+                    case 'scan_vulnerabilities':
+                        const vulnTarget = params.target || 'localhost';
+                        const vulnScanType = params.scan_type || 'nmap';
+                        if (vulnScanType === 'nikto') {
+                            return `Running command: nikto -h ${vulnTarget}`;
+                        } else {
+                            return `Running command: nmap --script vuln ${vulnTarget}`;
+                        }
+                    
+                    case 'analyze_web_app':
+                        const url = params.url || 'http://localhost';
+                        const tool = params.tool || 'gobuster';
+                        if (tool === 'dirb') {
+                            return `Running command: dirb ${url}`;
+                        } else if (tool === 'sqlmap') {
+                            return `Running command: sqlmap -u ${url} --batch --crawl=2`;
+                        } else {
+                            return `Running command: gobuster dir -u ${url} -w /usr/share/wordlists/dirb/common.txt`;
+                        }
+                    
+                    case 'brute_force_auth':
+                        const authTarget = params.target || 'localhost';
+                        const service = params.service || 'ssh';
+                        const username = params.username || 'admin';
+                        return `Running command: hydra -l ${username} -P /usr/share/wordlists/rockyou.txt ${authTarget} ${service}`;
+                    
+                    case 'collect_system_info':
+                        const infoType = params.info_type || 'general';
+                        if (infoType === 'network') {
+                            return `Running command: ifconfig && netstat -rn && arp -a`;
+                        } else if (infoType === 'processes') {
+                            return `Running command: ps aux && netstat -tulpn`;
+                        } else if (infoType === 'users') {
+                            return `Running command: whoami && id && w && last`;
+                        } else {
+                            return `Running command: uname -a && whoami && pwd && ls -la`;
+                        }
+                    
+                    case 'traffic_analysis':
+                        const iface = params.interface || 'en0';
+                        const duration = params.duration || 10;
+                        return `Running command: timeout ${duration} tcpdump -i ${iface} -c 50`;
+                    
+                    case 'install_tool':
+                        const toolName = params.tool || 'unknown';
+                        return `Running command: brew install ${toolName}`;
+                    
+                    case 'check_tool_availability':
+                        const tools = params.tools || ['unknown'];
+                        return `Running command: which ${tools.join(' && which ')}`;
+                    
+                    case 'infect_host':
+                        return `Attempting to infect host: ${params.target || params.host_id || 'unknown host'}`;
+                    
+                    case 'lateral_move':
+                        return `Attempting lateral movement to: ${params.target_host || params.target || 'unknown host'}`;
+                    
+                    case 'escalate_privilege':
+                        return `Attempting privilege escalation on: ${params.host_id || params.target || 'unknown host'}`;
+                    
+                    case 'exfiltrate_data':
+                        return `Attempting data exfiltration from: ${params.host_id || params.target || 'unknown host'}`;
+                    
+                    default:
+                        return `Executing task: ${taskType}`;
+                }
+            }
+            
             // Check if it's a direct command
             if (actionJson.command) {
-                return actionJson.command;
+                return `Running command: ${actionJson.command}`;
             }
             
-            // Check if it's a task with command parameter
-            if (actionJson.task === "execute_command" && actionJson.parameters && actionJson.parameters.command) {
-                return actionJson.parameters.command;
-            }
-            
-            // Ignore all other action types
             return null;
         } catch (e) {
             console.error("Error parsing JSON in action tag:", e);
@@ -43,55 +146,58 @@ function filterJsonContent(content) {
     try {
         let result = content;
         
-        // Remove action tags and their content
-        if (content.includes("<action>")) {
-            console.log("Content has action tags, filtering...");
+        // Check if this is a completion/goal achievement message
+        // These should be displayed with minimal filtering
+        const isCompletionMessage = /(?:goal.*(?:achieved|completed|reached)|(?:successfully|completion)|finished|done)/i.test(content);
+        const isGoodMessage = /(?:great job|excellent|congratulations|well done|success)/i.test(content);
+        
+        if (isCompletionMessage || isGoodMessage) {
+            // For completion messages, only remove action tags and obvious JSON structures
             result = result.replace(/<action>[\s\S]*?<\/action>/g, '');
+            
+            // Only remove obvious JSON objects that are completely separate from text
+            result = result.replace(/\n\s*\{\s*"[^"]+"\s*:[\s\S]*?\}\s*\n/g, '\n');
+            result = result.replace(/^\s*\{\s*"[^"]+"\s*:[\s\S]*?\}\s*$/gm, '');
+            
+            // Clean up excessive whitespace but preserve formatting
+            result = result.replace(/\n\s*\n\s*\n+/g, '\n\n'); // Multiple empty lines to double
+            result = result.replace(/^\s+|\s+$/g, ''); // Trim leading/trailing whitespace
+            
+            return result;
         }
         
-        // Checks for any known task type patterns
-        const hasTaskSpecification = 
-            content.includes('"task"') || 
-            content.includes('"command"') ||
-            content.includes('scan_network') ||
-            content.includes('infect_host') ||
-            content.includes('lateral_move') ||
-            content.includes('escalate_privilege') ||
-            content.includes('exfiltrate_data') ||
-            content.includes('EXECUTE_COMMAND') ||
-            content.includes('parameters');
+        // Standard filtering for regular messages
+        // Remove action tags and their content completely
+        result = result.replace(/<action>[\s\S]*?<\/action>/g, '');
         
-        if (hasTaskSpecification) {
-            console.log("Content has JSON objects, filtering...");
-            
-            // More comprehensive pattern to match JSON task specifications
-            // Match both lowercase and uppercase task names
-            result = result.replace(/\{\s*"task"[\s\S]*?\}/g, '');
-            result = result.replace(/\{\s*"TASK"[\s\S]*?\}/g, '');
-            result = result.replace(/\{\s*"command"[\s\S]*?\}/g, '');
-            result = result.replace(/\{\s*"COMMAND"[\s\S]*?\}/g, '');
-            
-            // Match any JSON that includes parameters
-            result = result.replace(/\{\s*[^{}]*"parameters"[\s\S]*?\}/g, '');
-            
-            // Last resort: more aggressive JSON removal for any remaining task-like specifications
-            // This pattern looks for JSON blocks with newlines that might be task specifications
-            result = result.replace(/\{\s*[\n\r][^\{\}]*\}/g, '');
-            
-            // Clean up any empty lines created by the filtering
-            result = result.replace(/\n\s*\n\s*\n/g, '\n\n');
-            
-            // Clean up any leftover JSON formatting
-            result = result.replace(/[\n\r]\s*\}/g, '');
-            
-            // Clean up any additional formatting issues that might be left
-            result = result.replace(/^\s*\n/, ''); // Remove empty lines at start
-            result = result.replace(/\n\s*$/, ''); // Remove empty lines at end
-            result = result.replace(/\n\s*,\s*\n/g, '\n'); // Remove dangling commas
-        }
+        // Remove complete JSON objects (only when they are clear JSON structures)
+        // This pattern matches complete JSON objects with braces
+        result = result.replace(/\{\s*"[^"]+"\s*:\s*[^}]+\}/g, '');
         
-        // Log after filtering
-        console.log("After filtering content:", result.substring(0, 50) + "...");
+        // Remove specific JSON fragments that commonly leak through
+        // Only target clear JSON key-value patterns with quotes and colons
+        result = result.replace(/"(?:task|TASK|command|COMMAND|parameters|target|scan_type|network)"\s*:\s*"[^"]*"/gi, '');
+        result = result.replace(/"parameters"\s*:\s*\{[^}]*\}/gi, '');
+        
+        // Remove incomplete JSON structures that appear in streaming
+        result = result.replace(/\{[^}]*$/g, ''); // Incomplete JSON at end
+        result = result.replace(/^[^{]*\}/g, ''); // Incomplete JSON at start
+        result = result.replace(/"\s*:\s*"[^"]*"/g, ''); // Orphaned key-value pairs
+        result = result.replace(/"\s*:\s*$/g, ''); // Incomplete key-value at end
+        result = result.replace(/,\s*$/g, ''); // Trailing commas
+        
+        // Remove concatenated words that are clearly from broken JSON parsing
+        // These are specific patterns that don't occur in natural language
+        result = result.replace(/\b(?:taskparameters|parameterscommand|taskexecute_command|execute_commandparameters|networktarget|targetscan_type)\b/gi, '');
+        
+        // Clean up remaining JSON structural characters when they appear isolated
+        result = result.replace(/(?:^|\s)[{}](?:\s|$)/g, ' '); // Isolated braces
+        result = result.replace(/(?:^|\s)["'\[\]](?:\s|$)/g, ' '); // Isolated quotes/brackets
+        result = result.replace(/[,]+/g, ' '); // Multiple commas
+        
+        // Clean up excessive whitespace
+        result = result.replace(/\s+/g, ' '); // Multiple spaces to single space
+        result = result.replace(/^\s+|\s+$/g, ''); // Trim leading/trailing whitespace
         
         return result;
     } catch (error) {
@@ -107,7 +213,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const appState = {
         sessionId: null,
         sessionActive: false,
-        autonomousMode: false,
+        autonomousMode: true,
         conversationStarted: false,  // Track if conversation has been initiated
         backendStatus: 'unknown',
         backendUrl: null,
@@ -116,12 +222,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         chatMode: 'auto'  // Can be 'auto', 'always', or 'never'
     };
 
+    // Debug: Check if DOM is ready
+    console.log('DEBUG: DOM loading state:', document.readyState);
+    console.log('DEBUG: Looking for reset-key-btn...', document.getElementById('reset-key-btn'));
+    
     // DOM Elements
     const elements = {
         // Session controls
         goalInput: document.getElementById('goal-input'),
         createSessionBtn: document.getElementById('create-session-btn'),
+        autonomousToggle: document.getElementById('autonomous-toggle'),
         modelSelect: document.getElementById('model-select'),
+        ptesToggle: document.getElementById('ptes-toggle'),
+        owaspToggle: document.getElementById('owasp-toggle'),
         resetKeyBtn: document.getElementById('reset-key-btn'),
         sessionInfo: document.getElementById('session-info'),
         sessionIdSpan: document.getElementById('session-id'),
@@ -138,7 +251,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         chatInput: document.getElementById('chat-input'),
         sendMessageBtn: document.getElementById('send-message-btn'),
         clearChatBtn: document.getElementById('clear-chat-btn'),
-        toggleChatModeBtn: document.getElementById('toggle-chat-mode-btn'),
+        toggleChatModeBtn: document.getElementById('toggle-chat-mode-btn'), // May be null if element doesn't exist
         inputLoadingIndicator: document.getElementById('input-loading-indicator'),
         
         // Terminal elements
@@ -151,7 +264,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         logEntries: document.getElementById('log-entries'),
         
         // Footer loading indicator
-        footerLoadingIndicator: document.getElementById('footer-loading-indicator')
+        footerLoadingIndicator: document.getElementById('footer-loading-indicator'),
+        
+        // API Key Modal elements
+        // Simple API modal elements accessed directly when needed
     };
 
     // Initialize the application
@@ -167,11 +283,32 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Set up event listeners
             setupEventListeners();
             
+            // Debug logging for reset button
+            console.log('Debug: resetKeyBtn element:', elements.resetKeyBtn);
+            console.log('Debug: resetKeyBtn exists:', !!elements.resetKeyBtn);
+            
             // Set up auto-scrolling with MutationObserver
             setupAutoScroll();
             
             // Add initial log entry
             addLogEntry('Application initialized', 'info');
+            
+            // Check if current provider has an API key, prompt if not
+            setTimeout(() => {
+                const [provider] = elements.modelSelect.value.split('/');
+                if (!localStorage.getItem(`apiKey_${provider}`)) {
+                    addChatMessage('System', `🔑 **API Key Required**\n\nTo use ${provider}, please enter your API key.`);
+                    // Use prompt for API key
+                const apiKey = prompt(`Enter API key for ${provider}:`);
+                if (apiKey && apiKey.trim()) {
+                    localStorage.setItem(`apiKey_${provider}`, apiKey.trim());
+                    if (window.api && window.api.setApiKey) {
+                        window.api.setApiKey(provider, apiKey.trim());
+                    }
+                    addChatMessage('System', `✅ API key saved for ${provider}`);
+                }
+                }
+            }, 1000); // Small delay to ensure UI is ready
             
         } catch (error) {
             console.error('Error initializing app:', error);
@@ -217,6 +354,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Create session button
         elements.createSessionBtn.addEventListener('click', createSession);
         
+        // Goal input Enter key support
+        elements.goalInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                createSession();
+            }
+        });
+        
+        // Autonomous mode toggle
+        elements.autonomousToggle.addEventListener('change', () => {
+            appState.autonomousMode = elements.autonomousToggle.checked;
+            console.log('Autonomous mode toggled:', appState.autonomousMode);
+        });
+        
         // No navigation links needed in the simplified UI
         
         // Chat input
@@ -233,28 +384,74 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Terminal controls
         elements.toggleTerminalBtn.addEventListener('click', toggleTerminal);
+        
+        // Framework toggle mutual exclusion
+        elements.ptesToggle.addEventListener('change', () => {
+            if (elements.ptesToggle.checked) {
+                elements.owaspToggle.checked = false;
+            }
+        });
+        
+        elements.owaspToggle.addEventListener('change', () => {
+            if (elements.owaspToggle.checked) {
+                elements.ptesToggle.checked = false;
+            }
+        });
         elements.clearTerminalBtn.addEventListener('click', clearTerminal);
         
-       // Chat mode toggle
-       elements.toggleChatModeBtn.addEventListener('click', toggleChatMode);
+       // Chat mode toggle (only if element exists)
+       if (elements.toggleChatModeBtn) {
+           elements.toggleChatModeBtn.addEventListener('click', toggleChatMode);
+       }
 
         elements.modelSelect.addEventListener('change', async () => {
             const [provider] = elements.modelSelect.value.split('/');
             if (!localStorage.getItem(`apiKey_${provider}`)) {
-                const key = prompt(`Enter API key for ${provider}`);
-                if (key) {
-                    localStorage.setItem(`apiKey_${provider}`, key);
-                    await window.api.setApiKey(provider, key);
+                // Automatically show API key modal when provider changes and no key exists
+                // Use prompt for API key
+                const apiKey = prompt(`Enter API key for ${provider}:`);
+                if (apiKey && apiKey.trim()) {
+                    localStorage.setItem(`apiKey_${provider}`, apiKey.trim());
+                    if (window.api && window.api.setApiKey) {
+                        window.api.setApiKey(provider, apiKey.trim());
+                    }
+                    addChatMessage('System', `✅ API key saved for ${provider}`);
                 }
             }
         });
 
-        elements.resetKeyBtn.addEventListener('click', async () => {
-            const [provider] = elements.modelSelect.value.split('/');
-            localStorage.removeItem(`apiKey_${provider}`);
-            await window.api.resetApiKey(provider);
-            alert('API key reset for ' + provider);
-        });
+        // Simple API Key Modal - Reset Button
+        console.log('Debug: Setting up resetKeyBtn event listener');
+        console.log('Debug: elements.resetKeyBtn =', elements.resetKeyBtn);
+        
+        if (elements.resetKeyBtn) {
+            console.log('Debug: resetKeyBtn found, adding event listener');
+            elements.resetKeyBtn.addEventListener('click', (event) => {
+                console.log('DEBUG: Reset button clicked!', event);
+                console.log('DEBUG: Event target:', event.target);
+                
+                const [provider] = elements.modelSelect.value.split('/');
+                console.log('DEBUG: Provider:', provider);
+                
+                // Use the existing modal system instead of prompt()
+                console.log('DEBUG: About to show API modal');
+                showSimpleApiModal(provider);
+                console.log('DEBUG: Modal shown for provider:', provider);
+            });
+            console.log('Debug: resetKeyBtn event listener added successfully');
+            
+            // Add a test click to verify the button is working
+            setTimeout(() => {
+                console.log('DEBUG: Testing button accessibility after 2 seconds');
+                console.log('DEBUG: Button still exists:', !!document.getElementById('reset-key-btn'));
+                console.log('DEBUG: Button element:', document.getElementById('reset-key-btn'));
+            }, 2000);
+        } else {
+            console.error('DEBUG: resetKeyBtn element not found!');
+        }
+        
+        
+        // Simple API Key Modal Events are now handled via onclick attributes in the dynamically created modal
         
         // Note: Log controls are hidden in the simplified UI
         // These log-related elements don't exist in this version of the app
@@ -271,29 +468,34 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
         
-        // Set up autonomous mode session
+        // Set up regular session (not autonomous)
         try {
             // Show loading indicators
             elements.createSessionBtn.disabled = true;
             elements.loadingIndicator.classList.remove('hidden');
-            // Goal can still be changed but session creation is disabled while loading
-            // elements.goalInput.disabled = true;
             
-            addLogEntry(`Creating autonomous session with goal: ${goal}`, 'info');
+            addLogEntry(`Creating session with goal: ${goal}`, 'info');
             
             // Remove the initial welcome message when starting
             clearChat();
             
             const [provider, model] = elements.modelSelect.value.split('/');
             if (!localStorage.getItem(`apiKey_${provider}`)) {
-                const key = prompt(`Enter API key for ${provider}`);
-                if (!key) {
-                    throw new Error('API key required');
+                // Show API key modal
+                // Use prompt for API key
+                const apiKey = prompt(`Enter API key for ${provider}:`);
+                if (apiKey && apiKey.trim()) {
+                    localStorage.setItem(`apiKey_${provider}`, apiKey.trim());
+                    if (window.api && window.api.setApiKey) {
+                        window.api.setApiKey(provider, apiKey.trim());
+                    }
+                    addChatMessage('System', `✅ API key saved for ${provider}`);
                 }
-                localStorage.setItem(`apiKey_${provider}`, key);
-                await window.api.setApiKey(provider, key);
+                throw new Error('API key required to create session');
             }
-            const response = await window.api.createSession(goal, provider, model);
+            const ptesEnabled = elements.ptesToggle.checked;
+            const owaspEnabled = elements.owaspToggle.checked;
+            const response = await window.api.createSession(goal, provider, model, ptesEnabled, owaspEnabled);
             console.log("Session creation response:", response);
             
             if (!response || !response.id) {
@@ -302,7 +504,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             appState.sessionId = response.id;
             appState.sessionActive = true;
-            appState.autonomousMode = true;
+            // autonomousMode is already set from the toggle
             
             // Update UI
             elements.sessionIdSpan.textContent = appState.sessionId;
@@ -313,10 +515,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             elements.chatInput.disabled = false;
             elements.sendMessageBtn.disabled = false;
             
-            // Update UI to indicate autonomous mode
-            elements.autonomousModeIndicator.classList.remove('hidden');
-            // Add a message explaining the autonomous execution
-            addChatMessage('System', `🎓 **Autonomous Analysis**\n\nYour goal: "${goal}"\n\nIncalmo will now automatically execute a series of tasks to achieve your goal.`)
+            // Add appropriate message based on autonomous mode
+            if (appState.autonomousMode) {
+                elements.autonomousModeIndicator.classList.remove('hidden');
+                addChatMessage('System', `🚀 **Autonomous Session Created**\n\nYour goal: "${goal}"\n\nIncalmo will now automatically execute a series of tasks to achieve your goal. Each step will be shown below as it executes.`);
+                // Automatically start execution
+                await sendAutomaticStartMessage();
+            } else {
+                addChatMessage('System', `💬 **Interactive Session Created**\n\nYour goal: "${goal}"\n\nYou can now chat with Incalmo by typing messages in the chat box below. Ask for specific tasks like "scan my network" or "check for vulnerabilities".`);
+            }
             
             // Add log entry
             addLogEntry(`Session created successfully. ID: ${appState.sessionId}`, 'success');
@@ -329,16 +536,31 @@ document.addEventListener('DOMContentLoaded', async () => {
             elements.createSessionBtn.disabled = false;
             elements.createSessionBtn.textContent = "Change Goal";
             
-            // Automatically start execution with 'start' message
-            await sendAutomaticStartMessage();
-            
         } catch (error) {
             console.error('Error creating session:', error);
             elements.createSessionBtn.disabled = false;
             elements.loadingIndicator.classList.add('hidden');
             elements.goalInput.disabled = false;
             addLogEntry(`Error creating session: ${JSON.stringify(error)}`, 'error');
-            addChatMessage('System', `❌ **Error creating session**\n\nDetails: ${error.message || JSON.stringify(error)}\n\nPlease check the backend logs for more details.`);
+            
+            // Check if this is an API key error
+            const errorMsg = error.message || JSON.stringify(error);
+            if (errorMsg.includes('API key required') || errorMsg.includes('401') || errorMsg.includes('authentication') || errorMsg.includes('invalid x-api-key')) {
+                const [provider] = elements.modelSelect.value.split('/');
+                addChatMessage('System', `❌ **Authentication Error**\n\nAPI key required for ${provider}. Please enter your API key to continue.`);
+                // Automatically show API key modal for authentication errors
+                // Use prompt for API key
+                const apiKey = prompt(`Enter API key for ${provider}:`);
+                if (apiKey && apiKey.trim()) {
+                    localStorage.setItem(`apiKey_${provider}`, apiKey.trim());
+                    if (window.api && window.api.setApiKey) {
+                        window.api.setApiKey(provider, apiKey.trim());
+                    }
+                    addChatMessage('System', `✅ API key saved for ${provider}`);
+                }
+            } else {
+                addChatMessage('System', `❌ **Error creating session**\n\nDetails: ${error.message || JSON.stringify(error)}\n\nPlease check the backend logs for more details.`);
+            }
         }
     }
     
@@ -711,12 +933,30 @@ document.addEventListener('DOMContentLoaded', async () => {
             addLogEntry(`Sent message to LLM: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`, 'info');
             
             // Send message to backend with autonomousMode flag
-            console.log("Sending message to session:", appState.sessionId, "Autonomous mode:", appState.autonomousMode, "Chat mode:", chatMode);
+            console.log("Sending message to session:", appState.sessionId, "Autonomous mode:", appState.autonomousMode, "Chat mode:", appState.chatMode);
             const response = await window.api.sendMessage(appState.sessionId, finalMessage, appState.autonomousMode);
             console.log("Received response:", response);
             
             if (!response) {
                 throw new Error("No response received from server");
+            }
+            
+            // Check for authentication errors in response content
+            const responseContent = response.response || response.content || '';
+            if (responseContent.includes('Error code: 401') || responseContent.includes('authentication_error') || responseContent.includes('invalid x-api-key')) {
+                const [provider] = elements.modelSelect.value.split('/');
+                addChatMessage('System', `❌ **Authentication Error**\n\nInvalid or missing API key for ${provider}. Please enter your API key.`);
+                // Automatically show API key modal for authentication errors
+                // Use prompt for API key
+                const apiKey = prompt(`Enter API key for ${provider}:`);
+                if (apiKey && apiKey.trim()) {
+                    localStorage.setItem(`apiKey_${provider}`, apiKey.trim());
+                    if (window.api && window.api.setApiKey) {
+                        window.api.setApiKey(provider, apiKey.trim());
+                    }
+                    addChatMessage('System', `✅ API key saved for ${provider}`);
+                }
+                return; // Don't process further if it's an auth error
             }
             
             // First show the immediate response to the user
@@ -786,8 +1026,25 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.error('Error sending message:', error);
             addLogEntry(`Error sending message: ${error.message}`, 'error');
             
-            // Add error message to chat for better visibility
-            addChatMessage('System', `❌ **Error processing your request**\n\nDetails: ${error.message || JSON.stringify(error)}\n\nTry simplifying your request or checking the backend logs for more information.`);
+            // Check if this is an API key error
+            const errorMsg = error.message || JSON.stringify(error);
+            if (errorMsg.includes('401') || errorMsg.includes('authentication') || errorMsg.includes('invalid x-api-key') || errorMsg.includes('API key')) {
+                const [provider] = elements.modelSelect.value.split('/');
+                addChatMessage('System', `❌ **Authentication Error**\n\nInvalid or missing API key for ${provider}. Please enter your API key.`);
+                // Automatically show API key modal for authentication errors
+                // Use prompt for API key
+                const apiKey = prompt(`Enter API key for ${provider}:`);
+                if (apiKey && apiKey.trim()) {
+                    localStorage.setItem(`apiKey_${provider}`, apiKey.trim());
+                    if (window.api && window.api.setApiKey) {
+                        window.api.setApiKey(provider, apiKey.trim());
+                    }
+                    addChatMessage('System', `✅ API key saved for ${provider}`);
+                }
+            } else {
+                // Add error message to chat for better visibility
+                addChatMessage('System', `❌ **Error processing your request**\n\nDetails: ${error.message || JSON.stringify(error)}\n\nTry simplifying your request or checking the backend logs for more information.`);
+            }
             
             elements.chatInput.disabled = false;
             elements.sendMessageBtn.disabled = false;
@@ -958,7 +1215,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Toggle chat mode button now shows command mode status
     function toggleChatMode() {
         addChatMessage('System', 'The assistant can respond conversationally or execute commands in our simulated environment. To run a command, ask the assistant to execute specific commands for you.');
-        elements.toggleChatModeBtn.textContent = 'Command Mode: Enabled';
+        if (elements.toggleChatModeBtn) {
+            elements.toggleChatModeBtn.textContent = 'Command Mode: Enabled';
+        }
     }
     
     // Add command to terminal
@@ -1048,6 +1307,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             let streamingMessageDiv = null;
             let streamingMessageContent = null;
             let actionTagProcessed = false; // Track if we've already processed an action tag
+            let rawStreamingContent = ''; // Track raw content to detect action tags
             
             socket.onmessage = (event) => {
                 try {
@@ -1081,6 +1341,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         if (!currentStreamingMessage) {
                             // Start a new streaming message
                             currentStreamingMessage = "";
+                            rawStreamingContent = "";
                             console.log("Starting new streaming message");
                             
                             // Create message elements
@@ -1105,27 +1366,54 @@ document.addEventListener('DOMContentLoaded', async () => {
                         if (data.chunk) {
                             console.log("Received chunk:", data.chunk.substring(0, 50) + "...");
                             
-                            // Only process command actions
-                            if (!actionTagProcessed && data.chunk.includes("<action>")) {
-                                // If we detect the beginning of an action tag, we should save it
-                                // to process when we have the complete action
-                                const openingTagPos = data.chunk.indexOf("<action>");
-                                const closingTagPos = data.chunk.indexOf("</action>");
-                                
-                                // If we have both opening and closing tags in the same chunk, we can process it now
-                                if (closingTagPos > openingTagPos) {
-                                    // Extract only command actions
-                                    const command = extractCommandFromAction(data.chunk);
-                                    if (command) {
-                                        // Only display system message for actual commands
-                                        addChatMessage('System', `🔄 **Running:** \`${command}\``);
-                                        actionTagProcessed = true;
+                            // Collect raw content to detect complete action tags
+                            rawStreamingContent += data.chunk;
+                            
+                            // Check for complete action tags in accumulated content BEFORE processing the streaming message
+                            if (!actionTagProcessed && rawStreamingContent.includes("<action>") && rawStreamingContent.includes("</action>")) {
+                                // Extract task information for system display
+                                const taskInfo = extractCommandFromAction(rawStreamingContent);
+                                if (taskInfo) {
+                                    // Pause streaming message creation to add system message first
+                                    if (streamingMessageDiv && !streamingMessageDiv.querySelector('.streaming-content').innerHTML) {
+                                        // Remove the empty streaming message
+                                        streamingMessageDiv.remove();
+                                        streamingMessageDiv = null;
+                                        currentStreamingMessage = "";
+                                    }
+                                    
+                                    // Display system message first
+                                    addChatMessage('System', `🔄 **${taskInfo}**`);
+                                    actionTagProcessed = true;
+                                    
+                                    // Recreate streaming message after system message
+                                    if (!streamingMessageDiv) {
+                                        streamingMessageDiv = document.createElement('div');
+                                        streamingMessageDiv.className = 'assistant-message streaming';
+                                        
+                                        const senderSpan = document.createElement('strong');
+                                        senderSpan.textContent = 'Assistant: ';
+                                        
+                                        streamingMessageContent = document.createElement('div');
+                                        streamingMessageContent.className = 'streaming-content';
+                                        
+                                        streamingMessageDiv.appendChild(senderSpan);
+                                        streamingMessageDiv.appendChild(streamingMessageContent);
+                                        
+                                        // Add to chat container
+                                        elements.chatMessages.appendChild(streamingMessageDiv);
                                     }
                                 }
                             }
                             
-                            // Filter all JSON content and action tags
-                            const filteredChunk = filterJsonContent(data.chunk);
+                            // Filter all JSON content and action tags more aggressively
+                            let filteredChunk = filterJsonContent(data.chunk);
+                            
+                            // Additional filtering for streaming chunks to remove JSON fragments
+                            filteredChunk = filteredChunk.replace(/\{[^}]*$/g, ''); // Remove incomplete JSON at end
+                            filteredChunk = filteredChunk.replace(/^[^{]*\}/g, ''); // Remove incomplete JSON at start
+                            filteredChunk = filteredChunk.replace(/"[^"]*":\s*"[^"]*"/g, ''); // Remove key-value pairs
+                            filteredChunk = filteredChunk.replace(/[{}]/g, ''); // Remove isolated braces
                             
                             // Add to the current message
                             currentStreamingMessage += filteredChunk;
@@ -1164,12 +1452,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 streamingMessageDiv.classList.remove('streaming');
                             }
                             
-                            // Check for command action tags in the complete message
-                            if (!actionTagProcessed && currentStreamingMessage && currentStreamingMessage.includes("<action>")) {
-                                const command = extractCommandFromAction(currentStreamingMessage);
-                                if (command) {
-                                    // Only display system message for actual commands
-                                    addChatMessage('System', `🔄 **Running:** \`${command}\``);
+                            // Check for task action tags in the complete message (fallback)
+                            if (!actionTagProcessed && rawStreamingContent && rawStreamingContent.includes("<action>")) {
+                                const taskInfo = extractCommandFromAction(rawStreamingContent);
+                                if (taskInfo) {
+                                    // Display system message for all task types
+                                    addChatMessage('System', `🔄 **${taskInfo}**`);
                                     actionTagProcessed = true;
                                 }
                             }
@@ -1179,6 +1467,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             streamingMessageDiv = null;
                             streamingMessageContent = null;
                             actionTagProcessed = false;
+                            rawStreamingContent = '';
                             
                             addLogEntry('Completed streaming response from LLM', 'success');
                         }
@@ -1202,6 +1491,124 @@ document.addEventListener('DOMContentLoaded', async () => {
             appState.webSocket = socket;
         });
     }
+
+    // Simple API Key Modal Functions
+    let currentSimpleProvider = null;
+    
+    function showSimpleApiModal(provider) {
+        console.log('showSimpleApiModal called with:', provider);
+        currentSimpleProvider = provider;
+        
+        // Check if modal exists, if not create it
+        let modal = document.getElementById('simple-api-modal');
+        if (!modal) {
+            console.log('Modal not found, creating it dynamically');
+            // Create modal dynamically
+            modal = document.createElement('div');
+            modal.id = 'simple-api-modal';
+            modal.style.cssText = 'display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;';
+            
+            modal.innerHTML = `
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 8px; min-width: 400px;">
+                    <h3 style="margin-top: 0;">Enter API Key</h3>
+                    <p>Provider: <span id="simple-provider-name">${provider}</span></p>
+                    <input type="password" id="simple-api-input" placeholder="Enter your API key" style="width: 100%; padding: 8px; margin: 10px 0; box-sizing: border-box;" onkeydown="if(event.key==='Enter')saveSimpleApiKey();if(event.key==='Escape')hideSimpleApiModal();">
+                    <div style="text-align: right; margin-top: 15px;">
+                        <button onclick="saveSimpleApiKey()" style="margin-right: 10px; padding: 8px 16px; background: #007AFF; color: white; border: none; border-radius: 4px; cursor: pointer;">Save</button>
+                        <button onclick="hideSimpleApiModal()" style="padding: 8px 16px; background: #ccc; border: none; border-radius: 4px; cursor: pointer;">Cancel</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            console.log('Modal created and added to body');
+        }
+        
+        // Update provider name
+        const providerEl = modal.querySelector('#simple-provider-name');
+        if (providerEl) providerEl.textContent = provider;
+        
+        // Clear input
+        const inputEl = modal.querySelector('#simple-api-input');
+        if (inputEl) inputEl.value = '';
+        
+        // Set up event listeners for HTML modal buttons (if they exist and don't have onclick)
+        const saveBtn = modal.querySelector('#simple-save-btn');
+        const cancelBtn = modal.querySelector('#simple-cancel-btn');
+        
+        if (saveBtn && !saveBtn.onclick) {
+            console.log('Adding event listener to Save button');
+            saveBtn.addEventListener('click', saveSimpleApiKey);
+        }
+        
+        if (cancelBtn && !cancelBtn.onclick) {
+            console.log('Adding event listener to Cancel button');  
+            cancelBtn.addEventListener('click', hideSimpleApiModal);
+        }
+        
+        // Add Enter/Escape key support to input
+        if (inputEl && !inputEl.onkeydown) {
+            inputEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') saveSimpleApiKey();
+                if (e.key === 'Escape') hideSimpleApiModal();
+            });
+        }
+        
+        // Show modal
+        modal.style.display = 'block';
+        console.log('Modal should now be visible');
+        
+        // Focus input
+        if (inputEl) {
+            setTimeout(() => inputEl.focus(), 100);
+        }
+    }
+    
+    function hideSimpleApiModal() {
+        const modal = document.getElementById('simple-api-modal');
+        if (modal) modal.style.display = 'none';
+    }
+    
+    function saveSimpleApiKey() {
+        const modal = document.getElementById('simple-api-modal');
+        if (!modal) return;
+        
+        const inputEl = modal.querySelector('#simple-api-input');
+        const apiKey = inputEl ? inputEl.value.trim() : '';
+        
+        if (!apiKey) {
+            alert('Please enter an API key.');
+            return;
+        }
+        
+        // Store API key
+        localStorage.setItem(`apiKey_${currentSimpleProvider}`, apiKey);
+        if (window.api && window.api.setApiKey) {
+            window.api.setApiKey(currentSimpleProvider, apiKey);
+        }
+        
+        // Hide modal and show success message
+        hideSimpleApiModal();
+        addChatMessage('System', `✅ API key saved for ${currentSimpleProvider}`);
+    }
+    
+    // Make functions globally accessible for onclick handlers
+    window.showSimpleApiModal = showSimpleApiModal;
+    window.hideSimpleApiModal = hideSimpleApiModal;
+    window.saveSimpleApiKey = saveSimpleApiKey;
+
+    // Test function to manually trigger reset button
+    window.testResetButton = function() {
+        console.log('Manual test: Looking for reset button...');
+        const btn = document.getElementById('reset-key-btn');
+        console.log('Manual test: Button found:', btn);
+        if (btn) {
+            console.log('Manual test: Triggering click...');
+            btn.click();
+        } else {
+            console.log('Manual test: Button not found!');
+        }
+    };
 
     // Initialize the application
     initializeApp();

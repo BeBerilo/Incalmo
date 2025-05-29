@@ -1,0 +1,27 @@
+
+> incalmo@1.0.0 dev
+> NODE_ENV=development electron .
+
+Backend files copied to temp directory
+Starting with default port 8713, will update if needed
+Starting Python backend: python3 /var/folders/7n/nr9_s9j5615bzb37cc45r2fm0000gn/T/incalmo-backend/main.py
+Backend not ready yet (connect ECONNREFUSED 127.0.0.1:8713), retrying...
+Backend not ready yet (connect ECONNREFUSED 127.0.0.1:8713), retrying...
+Backend not ready yet (connect ECONNREFUSED 127.0.0.1:8713), retrying...
+Python stdout: Starting server on port 8713
+
+Python stderr: INFO:     Will watch for changes in these directories: ['/private/var/folders/7n/nr9_s9j5615bzb37cc45r2fm0000gn/T/incalmo-backend']
+INFO:     Uvicorn running on http://0.0.0.0:8713 (Press CTRL+C to quit)
+INFO:     Started reloader process [6327] using StatReload
+
+Python stderr: INFO:     Started server process [6533]
+INFO:     Waiting for application startup.
+
+Python stderr: INFO:     Application startup complete.
+
+Python stdout: INFO:     127.0.0.1:49719 - "GET /health HTTP/1.1" 200 OK
+
+Backend started successfully on port 8713
+Python stdout: INFO:     127.0.0.1:49724 - "GET /health HTTP/1.1" 200 OK
+
+Terminating Python backend process...

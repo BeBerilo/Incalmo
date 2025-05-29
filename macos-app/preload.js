@@ -24,11 +24,11 @@ contextBridge.exposeInMainWorld('api', {
   },
   
   // Create a new session
-  createSession: async (goal, provider, model) => {
+  createSession: async (goal, provider, model, ptesEnabled = false, owaspEnabled = false) => {
     const backendUrl = await ipcRenderer.invoke('get-backend-url');
     try {
-      console.log(`Creating session with goal: ${goal}`);
-      const response = await fetch(`${backendUrl}/api/llm/session/create`, {
+      console.log(`Creating session with goal: ${goal}, PTES enabled: ${ptesEnabled}, OWASP enabled: ${owaspEnabled}`);
+      const response = await fetch(`${backendUrl}/api/sessions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -37,7 +37,9 @@ contextBridge.exposeInMainWorld('api', {
           goal: goal,
           environment_config: null,
           provider: provider,
-          model: model
+          model: model,
+          ptes_enabled: ptesEnabled,
+          owasp_enabled: owaspEnabled
         }),
       });
       

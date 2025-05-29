@@ -11,15 +11,87 @@ from enum import Enum
 from datetime import datetime
 
 
+class PTESPhase(str, Enum):
+    """PTES Framework phases for structured penetration testing."""
+    PRE_ENGAGEMENT = "pre_engagement"
+    INTELLIGENCE_GATHERING = "intelligence_gathering"
+    THREAT_MODELING = "threat_modeling"
+    VULNERABILITY_ANALYSIS = "vulnerability_analysis"
+    EXPLOITATION = "exploitation"
+    POST_EXPLOITATION = "post_exploitation"
+    REPORTING = "reporting"
+
+class OWASPPhase(str, Enum):
+    """OWASP Web Security Testing Guide phases for web application security testing."""
+    INFORMATION_GATHERING = "information_gathering"
+    CONFIGURATION_TESTING = "configuration_testing"
+    IDENTITY_MANAGEMENT = "identity_management"
+    AUTHENTICATION_TESTING = "authentication_testing"
+    AUTHORIZATION_TESTING = "authorization_testing"
+    SESSION_MANAGEMENT = "session_management"
+    INPUT_VALIDATION = "input_validation"
+    ERROR_HANDLING = "error_handling"
+    CRYPTOGRAPHY = "cryptography"
+    BUSINESS_LOGIC = "business_logic"
+    CLIENT_SIDE = "client_side"
+
+
 class TaskType(str, Enum):
     """Enum for high-level task types supported by Incalmo."""
+    # Network and Host Discovery
     SCAN_NETWORK = "scan_network"
+    SCAN_PORT = "scan_port"
+    DISCOVER_SERVICES = "discover_services"
+    ENUMERATE_USERS = "enumerate_users"
+    
+    # Vulnerability Assessment
+    SCAN_VULNERABILITIES = "scan_vulnerabilities"
+    ANALYZE_WEB_APP = "analyze_web_app"
+    TEST_DEFAULT_CREDS = "test_default_creds"
+    CHECK_MISCONFIGURATIONS = "check_misconfigurations"
+    
+    # Exploitation and Access
     INFECT_HOST = "infect_host"
     LATERAL_MOVE = "lateral_move"
     ESCALATE_PRIVILEGE = "escalate_privilege"
+    BRUTE_FORCE_AUTH = "brute_force_auth"
+    EXPLOIT_VULNERABILITY = "exploit_vulnerability"
+    
+    # Data Operations
     EXFILTRATE_DATA = "exfiltrate_data"
-    EXECUTE_COMMAND = "execute_command"  # Direct terminal command execution
+    COLLECT_SYSTEM_INFO = "collect_system_info"
+    DUMP_CREDENTIALS = "dump_credentials"
+    ACCESS_FILES = "access_files"
+    
+    # Network Operations
+    NETWORK_PIVOTING = "network_pivoting"
+    TRAFFIC_ANALYSIS = "traffic_analysis"
+    MITM_ATTACK = "mitm_attack"
+    
+    # Tools Management
+    INSTALL_TOOL = "install_tool"
+    CHECK_TOOL_AVAILABILITY = "check_tool_availability"
+    UPDATE_TOOLS = "update_tools"
+    
+    # System Operations
+    EXECUTE_COMMAND = "execute_command"
+    MONITOR_SYSTEM = "monitor_system"
+    SETUP_PERSISTENCE = "setup_persistence"
+    
+    # Action Planning
+    PLAN_ACTIONS = "plan_actions"
+    VALIDATE_GOAL = "validate_goal"
     FINISHED = "finished"
+    
+    # PTES Framework Management
+    ADVANCE_PTES_PHASE = "advance_ptes_phase"
+    REVIEW_PHASE_OBJECTIVES = "review_phase_objectives"
+    COMPLETE_PHASE = "complete_phase"
+    
+    # OWASP Framework tasks
+    ADVANCE_OWASP_PHASE = "advance_owasp_phase"
+    REVIEW_OWASP_OBJECTIVES = "review_owasp_objectives"
+    COMPLETE_OWASP_PHASE = "complete_owasp_phase"
 
 
 class LLMMessage(BaseModel):
@@ -114,6 +186,47 @@ class TaskResult(BaseModel):
         return dt.isoformat()
 
 
+class ActionPlan(BaseModel):
+    """Model representing an action plan to achieve a goal."""
+    id: str = Field(..., description="Unique identifier for the action plan")
+    goal: str = Field(..., description="The goal this plan aims to achieve")
+    actions: List[Dict[str, Any]] = Field(default_factory=list, description="List of planned actions")
+    current_action_index: int = Field(0, description="Index of the current action being executed")
+    status: str = Field("pending", description="Status of the plan (pending, executing, completed, failed)")
+    max_retries: int = Field(3, description="Maximum number of retries per action")
+    created_at: datetime = Field(default_factory=datetime.now, description="Timestamp of plan creation")
+    updated_at: datetime = Field(default_factory=datetime.now, description="Timestamp of last plan update")
+    
+    @field_serializer('created_at', 'updated_at')
+    def serialize_dt(self, dt: datetime):
+        return dt.isoformat()
+
+
+class TestExecution(BaseModel):
+    """Model representing a test execution instance."""
+    id: str = Field(..., description="Unique identifier for the test execution")
+    name: str = Field(..., description="Name of the test")
+    plan_id: str = Field(..., description="ID of the action plan being executed")
+    status: str = Field("pending", description="Status of the test (pending, running, completed, failed)")
+    start_time: Optional[datetime] = Field(None, description="Start time of the test")
+    end_time: Optional[datetime] = Field(None, description="End time of the test")
+    results: List[TaskResult] = Field(default_factory=list, description="Results of executed tasks")
+    environment_snapshot: Optional[Dict[str, Any]] = Field(None, description="Snapshot of environment state")
+    
+    @field_serializer('start_time', 'end_time')
+    def serialize_dt(self, dt: Optional[datetime]):
+        return dt.isoformat() if dt else None
+
+
+class SessionCreateRequest(BaseModel):
+    """Model for session creation request."""
+    goal: str = Field(..., description="The cybersecurity goal for this session")
+    environment_config: Optional[Dict[str, Any]] = Field(None, description="Optional environment configuration")
+    provider: str = Field("anthropic", description="LLM provider to use")
+    model: str = Field("claude-3-7-sonnet-20250219", description="Model to use")
+    ptes_enabled: bool = Field(False, description="Whether to enable PTES framework")
+    owasp_enabled: bool = Field(False, description="Whether to enable OWASP Web Security Testing Guide framework")
+
 class SessionState(BaseModel):
     """Model representing the state of a session."""
     id: str = Field(..., description="Unique identifier for the session")
@@ -123,9 +236,29 @@ class SessionState(BaseModel):
     task_history: List[TaskResult] = Field(default_factory=list, description="History of executed tasks")
     created_at: datetime = Field(default_factory=datetime.now, description="Timestamp of session creation")
     updated_at: datetime = Field(default_factory=datetime.now, description="Timestamp of last session update")
-    goal: Optional[str] = Field(None, description="The goal for this session if in autonomous mode")
+    goal: Optional[str] = Field(None, description="The current goal for this session")
+    action_plans: List[ActionPlan] = Field(default_factory=list, description="Action plans for achieving goals")
+    active_tests: List[TestExecution] = Field(default_factory=list, description="Currently active test executions")
+    completed_tests: List[TestExecution] = Field(default_factory=list, description="Completed test executions")
+    installed_tools: List[str] = Field(default_factory=list, description="List of installed cybersecurity tools")
     provider: str = Field("anthropic", description="LLM provider for this session")
     model: str = Field("claude-3-7-sonnet-20250219", description="Model used for this session")
+    autonomous_mode: bool = Field(False, description="Whether the session is running in autonomous mode")
+    max_parallel_tests: int = Field(3, description="Maximum number of parallel test executions")
+    
+    # PTES Framework tracking
+    ptes_enabled: bool = Field(False, description="Whether PTES framework is enabled for this session")
+    current_ptes_phase: PTESPhase = Field(PTESPhase.PRE_ENGAGEMENT, description="Current PTES framework phase")
+    ptes_phase_history: List[Dict[str, Any]] = Field(default_factory=list, description="History of PTES phase progression")
+    phase_objectives: Dict[str, List[str]] = Field(default_factory=dict, description="Objectives for each PTES phase")
+    phase_findings: Dict[str, Dict[str, Any]] = Field(default_factory=dict, description="Findings and results from each phase")
+    
+    # OWASP Framework tracking
+    owasp_enabled: bool = Field(False, description="Whether OWASP Web Security Testing Guide framework is enabled for this session")
+    current_owasp_phase: OWASPPhase = Field(OWASPPhase.INFORMATION_GATHERING, description="Current OWASP framework phase")
+    owasp_phase_history: List[Dict[str, Any]] = Field(default_factory=list, description="History of OWASP phase progression")
+    owasp_objectives: Dict[str, List[str]] = Field(default_factory=dict, description="Objectives for each OWASP phase")
+    owasp_findings: Dict[str, Dict[str, Any]] = Field(default_factory=dict, description="Findings and results from each OWASP phase")
 
     @field_serializer('created_at', 'updated_at')
     def serialize_dt(self, dt: datetime):

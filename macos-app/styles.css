@@ -67,6 +67,8 @@ body {
     display: flex;
     gap: 0.5rem;
     margin-top: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 #model-select {
@@ -74,6 +76,36 @@ body {
     border: 1px solid #ddd;
     border-radius: 4px;
     font-size: 0.8rem;
+}
+
+.framework-toggles {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.ptes-toggle-container,
+.owasp-toggle-container,
+.autonomous-toggle-container {
+    display: flex;
+    align-items: center;
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+#ptes-toggle,
+#owasp-toggle {
+    cursor: pointer;
+}
+
+.toggle-text {
+    user-select: none;
 }
 
 #goal-input {
@@ -560,6 +592,359 @@ body {
     color: #666;
     margin-left: 0.5rem;
     display: none;
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background-color: white;
+    border-radius: 8px;
+    padding: 2rem;
+    min-width: 400px;
+    max-width: 500px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.modal-content h3 {
+    margin-bottom: 1rem;
+    color: #333;
+}
+
+.modal-content p {
+    margin-bottom: 1rem;
+    color: #666;
+}
+
+.modal-content input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 1.5rem;
+    font-size: 1rem;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+}
+
+.modal-actions button {
+    padding: 0.5rem 1rem;
+}
+
+/* New Styles for Enhanced Cybersecurity Platform */
+
+/* Header Stats */
+.header-stats {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-top: 0.5rem;
+    font-size: 0.7rem;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.stat-label {
+    opacity: 0.7;
+}
+
+.stat-value {
+    font-weight: bold;
+    color: #00d4aa;
+}
+
+/* Action Planning Controls */
+#action-planning-controls {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 0.5rem;
+}
+
+.planning-buttons {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.test-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+#test-name-input {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+#parallel-tests-select {
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    background-color: white;
+}
+
+/* Enhanced Button Styles */
+.autonomous-btn {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.autonomous-btn:hover {
+    background-color: #0056b3;
+}
+
+.tertiary-btn {
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.tertiary-btn:hover {
+    background-color: #545b62;
+}
+
+.stop-btn {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    margin-left: 1rem;
+}
+
+.stop-btn:hover {
+    background-color: #c82333;
+}
+
+/* Enhanced Mode Indicator */
+.mode-indicator {
+    background-color: #e8f5e8;
+    border: 1px solid #28a745;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mode-icon {
+    font-size: 1.2rem;
+    margin-right: 0.5rem;
+}
+
+.mode-text {
+    font-weight: bold;
+    color: #28a745;
+}
+
+/* Enhanced Goal Input */
+#goal-input {
+    width: 100%;
+    min-height: 2.5rem;
+    padding: 0.75rem;
+    border: 2px solid #007bff;
+    border-radius: 8px;
+    font-size: 1rem;
+    resize: vertical;
+}
+
+#goal-input:focus {
+    outline: none;
+    border-color: #0056b3;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+}
+
+/* Enhanced Suggestion Buttons */
+.suggested-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.suggestion-btn {
+    background-color: #f8f9fa;
+    border: 1px solid #6c757d;
+    color: #6c757d;
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.suggestion-btn:not(:disabled):hover {
+    background-color: #007bff;
+    border-color: #007bff;
+    color: white;
+    transform: translateY(-1px);
+}
+
+.suggestion-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Test Status Indicators */
+.test-status-active {
+    color: #007bff;
+    font-weight: bold;
+}
+
+.test-status-completed {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.test-status-failed {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+/* Enhanced Chat Messages */
+.system-message {
+    background-color: #e3f2fd;
+    border-left: 4px solid #2196f3;
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+    border-radius: 4px;
+}
+
+.assistant-message {
+    background-color: #f8f9fa;
+    border-left: 4px solid #6c757d;
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+    border-radius: 4px;
+}
+
+.user-message {
+    background-color: #e8f5e8;
+    border-left: 4px solid #28a745;
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+    border-radius: 4px;
+    margin-left: 2rem;
+}
+
+/* Tool Installation Status */
+.tool-status {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    margin-left: 0.5rem;
+}
+
+.tool-installed {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.tool-missing {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.tool-installing {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+/* Progress Indicators */
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background-color: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 0.5rem 0;
+}
+
+.progress-fill {
+    height: 100%;
+    background-color: #007bff;
+    transition: width 0.3s ease;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .header-stats {
+        gap: 1rem;
+        font-size: 0.6rem;
+    }
+    
+    .planning-buttons {
+        flex-direction: column;
+    }
+    
+    .test-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .suggested-actions {
+        justify-content: flex-start;
+    }
+}
+
+/* Animation for Status Updates */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.6; }
+    100% { opacity: 1; }
+}
+
+.pulsing {
+    animation: pulse 1.5s infinite;
 }
 
 /* Utility Classes */

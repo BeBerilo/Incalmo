@@ -3,21 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Incalmo - LLM-powered Network Attack Tool</title>
+    <title>Incalmo - Intelligent Cybersecurity Automation Platform</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="app-container">
         <header class="app-header">
             <h1>Incalmo</h1>
-            <p class="subtitle">LLM-powered multistage network attack tool</p>
+            <p class="subtitle">Intelligent Cybersecurity Automation Platform</p>
+            <div class="header-stats">
+                <div class="stat-item">
+                    <span class="stat-label">Active Tests:</span>
+                    <span id="active-tests-count" class="stat-value">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Tools Installed:</span>
+                    <span id="installed-tools-count" class="stat-value">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Mode:</span>
+                    <span id="current-mode" class="stat-value">Manual</span>
+                </div>
+            </div>
         </header>
         
         <div class="main-content">
             <!-- Goal Input at the top -->
             <div id="goal-controls">
                 <div class="goal-input-container">
-                    <input type="text" id="goal-input" placeholder="Enter your security goal...">
+                    <input type="text" id="goal-input" placeholder="Enter your cybersecurity goal (e.g., 'Scan and assess the security of my local network')...">
                     <button id="create-session-btn" class="primary-btn">Start</button>
                     <div id="loading-indicator" class="loading-container hidden">
                         <div class="loading-spinner"></div>
@@ -25,16 +39,58 @@
                 </div>
                 <div class="model-select-container">
                     <select id="model-select">
+                        <option value="anthropic/claude-sonnet-4-20250514">Claude 4 Sonnet</option>
+                        <option value="anthropic/claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Latest)</option>
                         <option value="anthropic/claude-3-7-sonnet-20250219">Claude 3.7 Sonnet</option>
+                        <option value="anthropic/claude-3-5-sonnet-20240620">Claude 3.5 Sonnet (June)</option>
+                        <option value="anthropic/claude-3-opus-20240229">Claude 3 Opus</option>
+                        <option value="anthropic/claude-3-haiku-20240307">Claude 3 Haiku</option>
                         <option value="openai/gpt-4">OpenAI GPT-4</option>
+                        <option value="openai/gpt-4-turbo">OpenAI GPT-4 Turbo</option>
                         <option value="gemini/gemini-pro">Gemini Pro</option>
+                        <option value="gemini/gemini-1.5-pro">Gemini 1.5 Pro</option>
                     </select>
                     <button id="reset-key-btn" class="secondary-btn">Reset API Key</button>
+                    <div class="framework-toggles">
+                        <div class="ptes-toggle-container">
+                            <label class="toggle-label">
+                                <input type="checkbox" id="ptes-toggle">
+                                <span class="toggle-text">Enable PTES Framework</span>
+                            </label>
+                        </div>
+                        <div class="owasp-toggle-container">
+                            <label class="toggle-label">
+                                <input type="checkbox" id="owasp-toggle">
+                                <span class="toggle-text">Enable OWASP WSTG</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Action Planning Controls -->
+                <div id="action-planning-controls" class="hidden">
+                    <div class="planning-buttons">
+                        <button id="create-plan-btn" class="primary-btn">Create Action Plan</button>
+                        <button id="start-test-btn" class="secondary-btn">Start Test</button>
+                        <button id="install-tools-btn" class="secondary-btn">Install Tools</button>
+                        <button id="view-tests-btn" class="tertiary-btn">View Tests</button>
+                    </div>
+                    <div class="test-controls">
+                        <input type="text" id="test-name-input" placeholder="Test name (optional)">
+                        <select id="parallel-tests-select">
+                            <option value="1">1 Parallel Test</option>
+                            <option value="2">2 Parallel Tests</option>
+                            <option value="3" selected>3 Parallel Tests</option>
+                            <option value="4">4 Parallel Tests</option>
+                            <option value="5">5 Parallel Tests</option>
+                        </select>
+                    </div>
                 </div>
                 
                 <!-- Mode indicator -->
                 <div id="autonomous-mode-indicator" class="mode-indicator hidden">
-                    <span class="mode-icon">🎯</span> <span class="mode-text">Goal-based Autonomous Mode</span>
+                    <span class="mode-icon">🎯</span> <span class="mode-text">Autonomous Mode Active</span>
+                    <button id="stop-autonomous-btn" class="stop-btn">Stop</button>
                 </div>
                 
                 <!-- Session info hidden from users -->
@@ -52,7 +108,12 @@
                         <div class="chat-controls">
                             <button id="clear-chat-btn" class="secondary-btn">Clear Chat</button>
                             <button id="toggle-terminal-btn" class="secondary-btn">Toggle Terminal</button>
-                            <button id="toggle-chat-mode-btn" class="secondary-btn">Command Mode: Enabled</button>
+                            <div class="autonomous-toggle-container">
+                                <label class="toggle-label">
+                                    <input type="checkbox" id="autonomous-toggle" checked>
+                                    <span class="toggle-text">Autonomous Mode</span>
+                                </label>
+                            </div>
                         </div>
                         
                         <!-- Main chat -->
@@ -77,6 +138,8 @@
                         
                         <div class="suggested-actions">
                             <button id="suggest-scan" class="suggestion-btn" disabled>Scan Network</button>
+                            <button id="suggest-vuln" class="suggestion-btn" disabled>Scan Vulnerabilities</button>
+                            <button id="suggest-install" class="suggestion-btn" disabled>Install Tools</button>
                             <button id="suggest-execute" class="suggestion-btn" disabled>Run Command</button>
                             <button id="suggest-help" class="suggestion-btn" disabled>Help</button>
                             <button id="suggest-status" class="suggestion-btn" disabled>Status</button>
@@ -102,11 +165,25 @@
             </div>
         </div>
         
+        <!-- API Key Modal -->
+        <!-- Simple API Key Modal -->
+        <div id="simple-api-modal" class="simple-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+            <div class="simple-modal-content" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 8px; min-width: 400px;">
+                <h3 style="margin-top: 0;">Enter API Key</h3>
+                <p>Provider: <span id="simple-provider-name"></span></p>
+                <input type="password" id="simple-api-input" placeholder="Enter your API key" style="width: 100%; padding: 8px; margin: 10px 0; box-sizing: border-box;">
+                <div style="text-align: right; margin-top: 15px;">
+                    <button id="simple-save-btn" style="margin-right: 10px; padding: 8px 16px; background: #007AFF; color: white; border: none; border-radius: 4px; cursor: pointer;">Save</button>
+                    <button id="simple-cancel-btn" style="padding: 8px 16px; background: #ccc; border: none; border-radius: 4px; cursor: pointer;">Cancel</button>
+                </div>
+            </div>
+        </div>
+        
         <footer class="app-footer">
             <div id="footer-loading-indicator" class="loading-spinner hidden"></div>
             <div>
-                <p>Based on arXiv paper: "On the Feasibility of Using LLMs to Execute Multistage Network Attacks"</p>
-                <p>Powered by Claude 3.7 Sonnet</p>
+                <p>Intelligent Cybersecurity Automation Platform</p>
+                <p>Goal-based Action Planning • Multi-test Execution • Autonomous Tool Management</p>
             </div>
         </footer>
     </div>

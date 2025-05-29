@@ -1,56 +1,59 @@
-# Incalmo Requirements and Specifications
+# Incalmo - Intelligent Cybersecurity Automation Platform
 
 ## Overview
-Based on the paper "On the Feasibility of Using LLMs to Execute Multistage Network Attacks", we need to build Incalmo - an LLM-agnostic high-level attack abstraction layer that sits between an LLM and the environment. This tool will use Claude Sonnet 3.7 as the LLM and will have a web browser GUI.
+Incalmo is an LLM-powered cybersecurity automation platform that serves as an intelligent interface between Large Language Models and cybersecurity tools. Originally inspired by research on LLM-driven security assessments, Incalmo has evolved into a comprehensive automation platform for various cybersecurity tasks, including penetration testing, vulnerability assessment, security research, and compliance auditing.
 
 ## Core Components
 
 ### 1. LLM Integration Layer
-- Integrate with Claude Sonnet 3.7 as the primary LLM
-- Create a preprompt containing:
-  - Attacker goal
-  - Instructions for formatting queries and actions
-  - Documentation about the high-level API
-  - Initial known information about the environment
-- Extract LLM responses between `<action></action>` or `<query></query>` tags
-- Process LLM responses until a `<finished>` tag is received or a time limit is reached
+- Multi-LLM support (Claude Sonnet, OpenAI GPT, Google Gemini)
+- Intelligent prompt engineering for cybersecurity contexts
+- Goal-oriented task planning and execution
+- Real-time streaming communication via WebSocket
+- Dynamic API key management and provider switching
 
 ### 2. High-Level Task Abstraction
-- Implement high-level task abstractions that LLMs can use:
-  - Network scanning
-  - Host infection
-  - Lateral movement
-  - Privilege escalation
-  - Data exfiltration
-- Create translations that convert high-level tasks into low-level primitives
+- Comprehensive cybersecurity task library (25+ task types):
+  - Network and host discovery
+  - Vulnerability assessment and analysis
+  - Security testing and validation
+  - Information gathering and analysis
+  - Tool management and automation
+  - System monitoring and analysis
+- Flexible task execution allowing LLM choice of tools and methods
+- Autonomous tool installation for macOS environments
 
 ### 3. Environment State Service
-- Implement a knowledge base using Python objects
-- Create parsers to interpret command output and update the knowledge base
-- Track the state of the environment including:
-  - Discovered hosts
-  - Network topology
-  - Vulnerabilities
-  - Access privileges
+- Dynamic environment state tracking and management
+- Intelligent parsing of command outputs and tool results
+- Persistent knowledge base for discovered information:
+  - Network topology and discovered hosts
+  - Service enumeration and vulnerability data
+  - System information and access credentials
+  - Tool availability and configuration status
 
-### 4. Attack Graph Service
-- Provide a structured representation of attack paths
-- Help LLMs select actions relevant to a multistage attack
-- Enable reasoning about available attack paths
-- Support fine-grained access control between hosts
+### 4. PTES Framework Integration
+- **Structured Methodology**: Full implementation of PTES (Penetration Testing Execution Standard)
+- **Sequential Phase Progression**: 7-phase workflow with phase-to-phase output feeding
+- **Phase Tracking**: Automatic phase management and objective tracking
+- **Guided Execution**: LLM follows structured penetration testing methodology
+- **Phase Transitions**: Intelligent progression through assessment phases
 
-### 5. Web-Based GUI
-- Create a user-friendly interface that runs in a web browser
-- Provide visualization of:
-  - Network topology
-  - Attack graph
-  - Current environment state
-  - LLM interaction history
-- Allow users to:
-  - Set attack goals
-  - Monitor attack progress
-  - View detailed logs
-  - Interact with the LLM
+**PTES Phases Implemented**:
+1. **Pre-engagement Interactions** - Scope definition and authorization
+2. **Intelligence Gathering** - Passive and active reconnaissance  
+3. **Threat Modeling** - Attack vector identification and prioritization
+4. **Vulnerability Analysis** - Security flaw discovery and classification
+5. **Exploitation** - Controlled vulnerability validation
+6. **Post-exploitation** - Access depth and persistence assessment
+7. **Reporting** - Comprehensive findings documentation
+
+### 5. Desktop Application Interface
+- Native Electron-based desktop application
+- Real-time command execution monitoring
+- Interactive chat interface with LLM
+- Visual progress tracking and result display
+- Comprehensive logging and session management
 
 ## Technical Requirements
 

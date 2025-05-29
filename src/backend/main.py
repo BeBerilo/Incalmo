@@ -22,8 +22,8 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 # Create FastAPI app
 app = FastAPI(
     title="Incalmo",
-    description="An LLM-agnostic high-level attack abstraction layer using Claude 3.7 Sonnet",
-    version="0.1.0"
+    description="An intelligent cybersecurity automation platform with goal-based action planning, multi-test execution, and autonomous tool management",
+    version="0.2.0"
 )
 
 # Configure CORS for frontend - will be updated with the exposed port URL
@@ -36,13 +36,14 @@ app.add_middleware(
 )
 
 # Import routers
-from routers import llm, tasks, environment, attack_graph
+from routers import llm, tasks, environment, attack_graph, action_planner
 
 # Include routers
 app.include_router(llm.router, prefix="/api/llm", tags=["LLM Integration"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["Task Translation"])
 app.include_router(environment.router, prefix="/api/environment", tags=["Environment State"])
 app.include_router(attack_graph.router, prefix="/api/attack-graph", tags=["Attack Graph"])
+app.include_router(action_planner.router, prefix="/api", tags=["Action Planner"])
 
 # Import and set up core functionality
 from core import setup_core_routes
@@ -51,6 +52,14 @@ setup_core_routes(app)
 # Import and set up WebSocket functionality
 from websocket import setup_websocket_routes, websocket_manager
 setup_websocket_routes(app)
+
+# Initialize action planner service
+from services.action_planner_service import get_action_planner_service
+from services.llm_service import llm_service
+from services.task_service import task_translation_service
+
+# Initialize the action planner with required services
+action_planner = get_action_planner_service(llm_service, task_translation_service)
 
 # Simple middleware placeholder (kept for compatibility)
 @app.middleware("http")
@@ -62,8 +71,16 @@ async def root():
     """Root endpoint that returns basic API information."""
     return {
         "name": "Incalmo API",
-        "version": "0.1.0",
-        "description": "An LLM-agnostic high-level attack abstraction layer using Claude Sonnet 3.7"
+        "version": "0.2.0",
+        "description": "An intelligent cybersecurity automation platform with goal-based action planning, multi-test execution, and autonomous tool management",
+        "features": [
+            "Goal-based action planning",
+            "Multi-test parallel execution", 
+            "Autonomous tool installation",
+            "Comprehensive cybersecurity task types",
+            "LLM-agnostic design",
+            "Real-time WebSocket streaming"
+        ]
     }
 
 @app.get("/health")
@@ -81,7 +98,14 @@ async def get_config():
         "openaiReady": bool(OPENAI_API_KEY),
         "geminiReady": bool(GEMINI_API_KEY),
         "wsEnabled": True,
-        "version": "0.1.0"
+        "actionPlannerEnabled": bool(action_planner),
+        "version": "0.2.0",
+        "capabilities": {
+            "autonomous_mode": True,
+            "multi_test_execution": True,
+            "tool_auto_installation": True,
+            "comprehensive_task_types": True
+        }
     }
 
 def find_available_port(start_port=8713, max_attempts=100):
