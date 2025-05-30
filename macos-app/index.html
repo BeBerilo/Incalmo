@@ -127,22 +127,40 @@
                             </div>
                         </div>
                         
-                        <!-- Terminal that can toggle to full screen -->
+                        <!-- Enhanced Multi-Terminal Window -->
                         <div id="terminal-window" class="hidden">
                             <div class="terminal-header">
-                                <span>Terminal Output</span>
-                                <button id="clear-terminal-btn" class="mini-btn">Clear</button>
+                                <div class="terminal-tabs">
+                                    <div class="terminal-tab active" data-terminal="0">
+                                        <span class="tab-title">Terminal 1</span>
+                                        <button class="tab-close" onclick="closeTerminal(0)">×</button>
+                                    </div>
+                                    <button class="new-terminal-btn" onclick="createNewTerminal()">+</button>
+                                </div>
+                                <div class="terminal-controls">
+                                    <button id="clear-terminal-btn" class="mini-btn">Clear Active</button>
+                                    <button id="clear-all-terminals-btn" class="mini-btn">Clear All</button>
+                                </div>
                             </div>
-                            <div id="terminal-output"></div>
+                            <div id="terminal-container">
+                                <div class="terminal-session" id="terminal-0" data-session="0">
+                                    <div class="terminal-output" id="terminal-output-0"></div>
+                                    <div class="terminal-input-line">
+                                        <span class="prompt">$ </span>
+                                        <input type="text" class="terminal-input" id="terminal-input-0" placeholder="Type command and press Enter...">
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="suggested-actions">
-                            <button id="suggest-scan" class="suggestion-btn" disabled>Scan Network</button>
-                            <button id="suggest-vuln" class="suggestion-btn" disabled>Scan Vulnerabilities</button>
-                            <button id="suggest-install" class="suggestion-btn" disabled>Install Tools</button>
-                            <button id="suggest-execute" class="suggestion-btn" disabled>Run Command</button>
-                            <button id="suggest-help" class="suggestion-btn" disabled>Help</button>
-                            <button id="suggest-status" class="suggestion-btn" disabled>Status</button>
+                            <button class="suggestion-btn" onclick="document.getElementById('chat-input').value='scan my network';" title="Basic network discovery">Scan Network</button>
+                            <button class="suggestion-btn" onclick="document.getElementById('chat-input').value='check for vulnerabilities';" title="Vulnerability assessment">Find Vulnerabilities</button>
+                            <button class="suggestion-btn" onclick="document.getElementById('chat-input').value='analyze web applications';" title="Web application testing">Web App Testing</button>
+                            <button class="suggestion-btn" onclick="document.getElementById('chat-input').value='test authentication';" title="Authentication testing">Auth Testing</button>
+                            <button class="suggestion-btn" onclick="document.getElementById('chat-input').value='install security tools';" title="Install required tools">Install Tools</button>
+                            <button class="suggestion-btn" onclick="executeDirectCommand('ls -la');" title="List directory contents">ls -la</button>
+                            <button class="suggestion-btn" onclick="executeDirectCommand('ifconfig');" title="Show network interfaces">ifconfig</button>
                         </div>
                         
                         <div class="chat-input-container">

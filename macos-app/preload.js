@@ -9,6 +9,9 @@ contextBridge.exposeInMainWorld('api', {
   // Send a message to the Python backend
   sendMessage: async (sessionId, message, autonomousMode = false) => {
     const backendUrl = await ipcRenderer.invoke('get-backend-url');
+    console.log('Sending message to:', `${backendUrl}/api/llm/message`);
+    console.log('Payload:', { session_id: sessionId, message: message, autonomous_mode: autonomousMode });
+    
     const response = await fetch(`${backendUrl}/api/llm/message`, {
       method: 'POST',
       headers: {
@@ -20,7 +23,18 @@ contextBridge.exposeInMainWorld('api', {
         autonomous_mode: autonomousMode
       }),
     });
-    return response.json();
+    
+    console.log('Response status:', response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error response:', errorText);
+      throw new Error(`Server error: ${response.status} - ${errorText}`);
+    }
+    
+    const result = await response.json();
+    console.log('Response data:', result);
+    return result;
   },
   
   // Create a new session

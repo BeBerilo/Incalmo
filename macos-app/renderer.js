@@ -506,6 +506,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             appState.sessionActive = true;
             // autonomousMode is already set from the toggle
             
+            console.log('[DEBUG] Session ID set, immediately setting up WebSocket:', appState.sessionId);
+            // Setup WebSocket connection for real-time updates IMMEDIATELY
+            setupWebSocket(appState.sessionId);
+            console.log('[DEBUG] WebSocket setup initiated');
+            
             // Update UI
             elements.sessionIdSpan.textContent = appState.sessionId;
             elements.sessionStatusSpan.textContent = 'Active';
@@ -528,8 +533,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Add log entry
             addLogEntry(`Session created successfully. ID: ${appState.sessionId}`, 'success');
             
-            // Setup WebSocket connection for real-time updates
-            setupWebSocket(appState.sessionId);
+            // WebSocket was already set up earlier
             
             // Hide loading indicator and re-enable the create button
             elements.loadingIndicator.classList.add('hidden');
@@ -784,11 +788,35 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             // Send message to backend with autonomousMode flag
             console.log("Auto-sending message to session:", appState.sessionId, "Autonomous mode:", appState.autonomousMode);
+            console.log("Sending message:", startMessage);
             const response = await window.api.sendMessage(appState.sessionId, startMessage, appState.autonomousMode);
             console.log("Received response from auto-start:", response);
             
             if (!response) {
                 throw new Error("No response received from server");
+            }
+            
+            if (response.error) {
+                throw new Error(response.error);
+            }
+            
+            // Check for LLM response
+            if (response.llm_response) {
+                console.log("[DEBUG] LLM response received:", response.llm_response);
+                
+                // Add LLM response to chat (this should also be coming via WebSocket)
+                if (response.llm_response.content) {
+                    const filteredContent = filterJsonContent(response.llm_response.content);
+                    if (filteredContent.trim()) {
+                        console.log("[DEBUG] Adding LLM response to chat:", filteredContent.substring(0, 100));
+                        addChatMessage('Assistant', filteredContent);
+                    }
+                }
+            }
+            
+            // Check for task result
+            if (response.task_result) {
+                console.log("[DEBUG] Task result received:", response.task_result);
             }
             
             // First show the immediate response to the user
@@ -1291,15 +1319,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Initialize WebSocket connection
     function setupWebSocket(sessionId) {
-        if (!sessionId) return;
+        console.log('[DEBUG] setupWebSocket called with sessionId:', sessionId);
+        if (!sessionId) {
+            console.error('[DEBUG] No sessionId provided to setupWebSocket');
+            return;
+        }
         
         // Get backend URL from main process
+        console.log('[DEBUG] Getting backend URL for WebSocket...');
         window.api.getBackendUrl().then(backendUrl => {
             const wsUrl = backendUrl.replace('http://', 'ws://') + `/ws/${sessionId}`;
-            const socket = new WebSocket(wsUrl);
+            console.log('[DEBUG] Attempting WebSocket connection to:', wsUrl);
+            
+            try {
+                const socket = new WebSocket(wsUrl);
+                console.log('[DEBUG] WebSocket object created:', socket);
             
             socket.onopen = () => {
+                console.log(`[DEBUG] WebSocket connected to ${wsUrl}`);
                 addLogEntry(`WebSocket connection established for session ${sessionId}`, 'info');
+                addChatMessage('System', `🔗 **WebSocket Connected** - Real-time updates enabled`);
             };
             
             // Variables for handling streaming messages
@@ -1310,8 +1349,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             let rawStreamingContent = ''; // Track raw content to detect action tags
             
             socket.onmessage = (event) => {
+                console.log(`[DEBUG] WebSocket message received:`, event.data);
                 try {
                     const data = JSON.parse(event.data);
+                    console.log(`[DEBUG] Parsed WebSocket data:`, data);
                     
                     // Handle different update types
                     if (data.type === 'task_result') {
@@ -1333,16 +1374,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                         addLogEntry('Received response from LLM', 'success');
                     } else if (data.type === 'llm_streaming_chunk') {
                         // Handle streaming chunks
-                        console.log(`Received streaming chunk: length=${data.chunk?.length || 0}, is_done=${data.is_done}`);
+                        console.log(`[DEBUG] Received streaming chunk: length=${data.chunk?.length || 0}, is_done=${data.is_done}`);
                         if (data.chunk?.length > 0) {
-                            console.log(`Chunk preview: ${data.chunk.substring(0, 50)}...`);
+                            console.log(`[DEBUG] Chunk preview: ${data.chunk.substring(0, 100)}...`);
                         }
+                        console.log(`[DEBUG] Current streaming state: currentStreamingMessage=${!!currentStreamingMessage}, streamingMessageDiv=${!!streamingMessageDiv}`);
                         
                         if (!currentStreamingMessage) {
                             // Start a new streaming message
                             currentStreamingMessage = "";
                             rawStreamingContent = "";
-                            console.log("Starting new streaming message");
+                            console.log("[DEBUG] Starting new streaming message");
                             
                             // Create message elements
                             streamingMessageDiv = document.createElement('div');
@@ -1364,7 +1406,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         
                         // Add the chunk to the current message
                         if (data.chunk) {
-                            console.log("Received chunk:", data.chunk.substring(0, 50) + "...");
+                            console.log("[DEBUG] Processing chunk:", data.chunk.substring(0, 50) + "...");
                             
                             // Collect raw content to detect complete action tags
                             rawStreamingContent += data.chunk;
@@ -1446,7 +1488,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         
                         // If this is the last chunk, finalize the message
                         if (data.is_done) {
-                            console.log("Finalized streaming message");
+                            console.log("[DEBUG] Finalizing streaming message");
                             if (streamingMessageDiv) {
                                 // Remove streaming class to stop any animation
                                 streamingMessageDiv.classList.remove('streaming');
@@ -1473,22 +1515,36 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
                     }
                 } catch (error) {
-                    console.error('Error processing WebSocket message:', error);
+                    console.error('[DEBUG] Error processing WebSocket message:', error);
+                    console.error('[DEBUG] Raw message data:', event.data);
                 }
             };
             
             socket.onclose = () => {
+                console.log('[DEBUG] WebSocket connection closed');
                 addLogEntry(`WebSocket connection closed for session ${sessionId}`, 'warning');
+                addChatMessage('System', `⚠️ **WebSocket Disconnected** - Attempting to reconnect...`);
                 // Try to reconnect after a delay
                 setTimeout(() => setupWebSocket(sessionId), 5000);
             };
             
             socket.onerror = (error) => {
+                console.error('[DEBUG] WebSocket error:', error);
                 addLogEntry(`WebSocket error: ${error.message}`, 'error');
+                addChatMessage('System', `❌ **WebSocket Error** - ${error.message}`);
             };
             
             // Store socket in appState
             appState.webSocket = socket;
+            console.log('[DEBUG] WebSocket stored in appState');
+            
+            } catch (error) {
+                console.error('[DEBUG] Error creating WebSocket:', error);
+                addChatMessage('System', `❌ **WebSocket Creation Failed** - ${error.message}`);
+            }
+        }).catch(error => {
+            console.error('[DEBUG] Error getting backend URL for WebSocket:', error);
+            addChatMessage('System', `❌ **Failed to get backend URL** - ${error.message}`);
         });
     }
 
